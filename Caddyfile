@@ -1,0 +1,4 @@
+# Đổi thành tên miền của bạn, ví dụ scamshield.example.com
+your-domain.example.com {
+    reverse_proxy api:8000
+}

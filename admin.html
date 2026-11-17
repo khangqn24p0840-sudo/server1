@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ScamShield – Quản trị</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--tx:#1a1d23;--mu:#6b7280;--bd:#e3e6eb;--pr:#2563eb;--dg:#dc2626;--ok:#16a34a;--wa:#d97706}
+@media (prefers-color-scheme:dark){:root{--bg:#14161a;--card:#1d2026;--tx:#e8eaee;--mu:#9aa1ad;--bd:#2c313a;--pr:#60a5fa;--dg:#f87171;--ok:#4ade80;--wa:#fbbf24}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx)}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--card);border-bottom:1px solid var(--bd)}
+h1{font-size:18px;margin:0}
+main{max-width:1000px;margin:0 auto;padding:20px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.stat b{display:block;font-size:26px}.stat span{color:var(--mu);font-size:13px}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tab{padding:8px 14px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--tx);cursor:pointer;font:inherit}
+.tab.on{background:var(--pr);border-color:var(--pr);color:#fff}
+input,textarea,select{font:inherit;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);width:100%}
+textarea{min-height:90px}
+button{font:inherit;padding:7px 12px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);cursor:pointer}
+button:hover{border-color:var(--pr)}
+button.p{background:var(--pr);border-color:var(--pr);color:#fff}
+button.d{color:var(--dg)}
+.row{display:flex;gap:8px;margin-bottom:12px;align-items:center}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--bd);white-space:nowrap}
+th{color:var(--mu);font-size:13px;font-weight:600}
+td.acts{display:flex;gap:6px}
+.tag{padding:2px 8px;border-radius:99px;font-size:12px;border:1px solid var(--bd)}
+.tag.ok{color:var(--ok)}.tag.bad{color:var(--dg)}
+.mu{color:var(--mu)}
+#login{max-width:380px;margin:12vh auto}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:8px;display:none;max-width:90%}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:16px}
+#modal .box{background:var(--card);border-radius:12px;padding:20px;max-width:420px;width:100%}
+code{background:var(--bg);padding:6px 10px;border-radius:6px;display:block;margin:10px 0;word-break:break-all;user-select:all;font-size:16px}
+.hide{display:none}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+.grid2 h3,#t-dash h3{margin:0 0 8px;font-size:15px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--mu);margin-top:6px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd);font-size:14px}
+.li:last-child{border-bottom:0}
+</style>
+</head>
+<body>
+<div id="login" class="card">
+  <h1>🛡️ ScamShield – Quản trị</h1>
+  <p class="mu">Nhập khóa quản trị (giá trị <code style="display:inline;padding:1px 6px">ADMIN_KEY</code> của máy chủ).</p>
+  <div class="row"><input id="key" type="password" placeholder="Khóa quản trị" autocomplete="off"></div>
+  <button class="p" id="go" style="width:100%">Đăng nhập</button>
+  <p id="lerr" class="mu" style="color:var(--dg)"></p>
+</div>
+
+<div id="app" class="hide">
+  <header><h1>🛡️ ScamShield – Quản trị</h1><button id="out">Thoát</button></header>
+  <main>
+    <div class="stats" id="stats"></div>
+    <div class="tabs">
+      <button class="tab on" data-t="dash">Tổng quan</button>
+      <button class="tab" data-t="users">Tài khoản</button>
+      <button class="tab" data-t="block">Số lừa đảo</button>
+      <button class="tab" data-t="posts">Bài đăng</button>
+      <button class="tab" data-t="comments">Bình luận</button>
+      <button class="tab" data-t="news">Tin báo chí</button>
+      <button class="tab" data-t="survey">Khảo sát</button>
+    </div>
+
+    <section id="t-dash">
+      <div class="row"><b>Tổng quan hoạt động</b><span style="flex:1"></span>
+        <select id="dd" style="width:auto"><option value="7">7 ngày</option><option value="14" selected>14 ngày</option><option value="30">30 ngày</option></select>
+        <button id="dr">Làm mới</button></div>
+      <div class="stats" id="kpi"></div>
+      <div class="card"><h3>Hoạt động theo ngày</h3><div id="chart"></div><div class="legend" id="legend"></div></div>
+      <div class="grid2">
+        <div class="card"><h3>Cảnh báo cộng đồng theo chủ đề</h3><div id="bytopic"></div></div>
+        <div class="card"><h3>Cảnh báo từ máy người dùng (ẩn danh)</h3><div id="byevent"></div></div>
+        <div class="card"><h3>Cần xử lý</h3><div id="modq"></div></div>
+        <div class="card"><h3>Đóng góp nhiều nhất</h3><div id="top"></div></div>
+        <div class="card"><h3>Đăng ký gần đây</h3><div id="recent"></div></div>
+      </div>
+      <p class="mu" id="dupd"></p>
+    </section>
+
+    <section id="t-users" class="card hide">
+      <div class="row"><input id="q" placeholder="Tìm theo email…"><button id="rf">Tải lại</button></div>
+      <div class="tw"><table><thead><tr><th>ID</th><th>Email</th><th>Ngày tạo</th><th>Thống kê</th><th>Trạng thái</th><th></th></tr></thead><tbody id="ub"></tbody></table></div>
+      <p class="mu" id="ucount"></p>
+    </section>
+
+    <section id="t-block" class="card hide">
+      <textarea id="nums" placeholder="Dán số điện thoại, mỗi số một dòng (0901234567, +84 28 3822 1234…)"></textarea>
+      <div class="row" style="margin-top:8px"><input id="src" placeholder="Nguồn (tùy chọn)" value="admin"><button class="p" id="addn">Thêm số</button></div>
+      <div class="tw"><table><thead><tr><th>Số</th><th>Nguồn</th><th>Ngày thêm</th><th></th></tr></thead><tbody id="bb"></tbody></table></div>
+    </section>
+
+    <section id="t-posts" class="card hide">
+      <h3 style="margin:0 0 8px">Đăng cảnh báo chính thức</h3>
+      <p class="mu">Hiện nhãn "CHÍNH THỨC", tác giả là ScamShield. Dùng để mở đầu bảng tin bằng thông tin thật đã kiểm chứng.</p>
+      <input id="ot" placeholder="Tiêu đề (3–120 ký tự)" maxlength="120">
+      <textarea id="ob" placeholder="Nội dung cảnh báo (5–1000 ký tự)" maxlength="1000" style="margin-top:8px"></textarea>
+      <div class="row" style="margin-top:8px">
+        <select id="otopic"><option value="ngan-hang">Ngân hàng</option><option value="mang-xa-hoi">Mạng xã hội</option><option value="dien-thoai" selected>Điện thoại</option><option value="viec-lam">Việc làm</option><option value="khac">Khác</option></select>
+        <select id="osev"><option value="low">Mức thấp</option><option value="medium">Mức trung bình</option><option value="high" selected>Mức cao</option></select>
+        <button class="p" id="opost">Đăng chính thức</button>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--bd,#2a3550);margin:16px 0">
+      <p class="mu">Bài bị báo cáo từ 3 người trở lên sẽ tự ẩn và nằm đầu danh sách để bạn xem lại.</p>
+      <div class="tw"><table><thead><tr><th>Thời gian</th><th>Người đăng</th><th>Bài</th><th>👍</th><th>💬</th><th>🚩</th><th>Trạng thái</th><th></th></tr></thead><tbody id="pb"></tbody></table></div>
+    </section>
+
+    <section id="t-comments" class="card hide">
+      <p class="mu">Bình luận bị báo cáo từ 3 người trở lên sẽ tự ẩn và nằm đầu danh sách.</p>
+      <div class="tw"><table><thead><tr><th>Thời gian</th><th>Người bình luận</th><th>Bình luận</th><th>Thuộc bài</th><th>🚩</th><th>Trạng thái</th><th></th></tr></thead><tbody id="cb"></tbody></table></div>
+    </section>
+
+    <section id="t-news" class="card hide">
+      <p class="mu">App chỉ hiện <b>tiêu đề, tóm tắt ngắn, tên báo</b> và nút "Đọc bài gốc" (mở trang của báo). Chỉ lấy bài có từ khóa liên quan lừa đảo.
+        Hãy đọc điều khoản dùng RSS của từng báo và tắt nguồn nếu báo không cho phép.</p>
+      <div class="row"><input id="nsn" placeholder="Tên báo (vd: Dân trí – Pháp luật)"><input id="nsu" placeholder="Địa chỉ RSS (https://…)"><button class="p" id="nsa">Thêm nguồn</button></div>
+      <div class="row" style="margin:8px 0"><button id="nsr">Tải tin ngay</button><span class="mu" id="nsmsg"></span></div>
+      <div class="tw"><table><thead><tr><th>Báo</th><th>Địa chỉ RSS</th><th>Lần chạy gần nhất</th><th>Kết quả</th><th>Tin</th><th>Trạng thái</th><th></th></tr></thead><tbody id="nsb"></tbody></table></div>
+      <h3 style="margin:16px 0 8px">Tin đã thu thập</h3>
+      <div class="tw"><table><thead><tr><th>Ngày đăng</th><th>Báo</th><th>Chủ đề</th><th>Tiêu đề (bấm để mở bài gốc)</th><th>Trạng thái</th><th></th></tr></thead><tbody id="nb"></tbody></table></div>
+    </section>
+
+    <section id="t-survey" class="card hide">
+      <p class="mu">Khảo sát ẩn danh (không kèm email).</p>
+      <div class="tw"><table><thead><tr><th>Thời gian</th><th>Câu trả lời</th></tr></thead><tbody id="sb"></tbody></table></div>
+    </section>
+  </main>
+</div>
+
+<div id="modal"><div class="box"><div id="mbody"></div><div class="row" style="justify-content:flex-end;margin:0" id="mbtn"></div></div></div>
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let KEY = sessionStorage.getItem("ak") || "";
+
+const el = (tag, props = {}, ...kids) => {
+  const e = document.createElement(tag);
+  Object.assign(e, props);
+  kids.forEach(k => e.append(k));
+  return e;
+};
+const fmt = ts => ts ? new Date(ts * 1000).toLocaleString("vi-VN") : "";
+function toast(m){const t=$("#toast");t.textContent=m;t.style.display="block";clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display="none",3000)}
+
+async function api(method, path, data) {
+  const r = await fetch(path, {
+    method,
+    headers: {"X-Admin-Key": KEY, "Content-Type": "application/json"},
+    body: data === undefined ? undefined : JSON.stringify(data)
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    if (r.status === 403 && path !== "/admin/stats") { /* sai khóa */ }
+    throw new Error(j.error || ("Lỗi " + r.status));
+  }
+  return j;
+}
+
+function modal(content, buttons) {
+  const b = $("#mbody"); b.replaceChildren(...content);
+  const m = $("#mbtn"); m.replaceChildren();
+  buttons.forEach(([label, cls, fn]) => m.append(el("button", {textContent: label, className: cls || "", onclick: async () => { if (fn) await fn(); $("#modal").style.display = "none"; }})));
+  $("#modal").style.display = "flex";
+}
+
+async function enter() {
+  try { await loadStats(); } catch (e) { $("#lerr").textContent = e.message; sessionStorage.removeItem("ak"); return; }
+  $("#login").classList.add("hide"); $("#app").classList.remove("hide");
+  loadDash();
+}
+
+async function loadStats() {
+  const s = await api("GET", "/admin/stats");
+  const box = $("#stats"); box.replaceChildren();
+  [["Tài khoản", s.users], ["Số lừa đảo", s.blocklist], ["Khảo sát", s.surveys],
+   ["Sự kiện thống kê", s.events.reduce((a, e) => a + e.count, 0)]]
+    .forEach(([l, v]) => box.append(el("div", {className: "card stat"}, el("b", {textContent: v}), el("span", {textContent: l}))));
+}
+
+async function loadUsers() {
+  try {
+    const j = await api("GET", "/admin/users?q=" + encodeURIComponent($("#q").value));
+    const tb = $("#ub"); tb.replaceChildren();
+    j.users.forEach(u => {
+      const acts = el("td", {className: "acts"},
+        el("button", {textContent: u.disabled ? "Mở khóa" : "Khóa", onclick: () => toggle(u)}),
+        el("button", {textContent: "Đặt lại MK", onclick: () => resetPw(u)}),
+        el("button", {textContent: "Xóa", className: "d", onclick: () => del(u)}));
+      tb.append(el("tr", {},
+        el("td", {textContent: u.id}), el("td", {textContent: u.email}), el("td", {textContent: fmt(u.created)}),
+        el("td", {textContent: u.consent ? u.events + " sự kiện" : "Không đồng ý", className: "mu"}),
+        el("td", {}, el("span", {className: "tag " + (u.disabled ? "bad" : "ok"), textContent: u.disabled ? "Đã khóa" : "Hoạt động"})),
+        acts));
+    });
+    $("#ucount").textContent = `Hiển thị ${j.users.length} / ${j.total} tài khoản`;
+  } catch (e) { toast(e.message); }
+}
+
+async function toggle(u) {
+  try { await api("POST", `/admin/users/${u.id}/disable`, {disabled: !u.disabled});
+    toast(u.disabled ? "Đã mở khóa" : "Đã khóa và đăng xuất tài khoản"); loadUsers(); } catch (e) { toast(e.message); }
+}
+
+function resetPw(u) {
+  const inp = el("input", {placeholder: "Để trống = tự sinh mật khẩu tạm", type: "text"});
+  modal([el("h3", {textContent: "Đặt lại mật khẩu"}), el("p", {className: "mu", textContent: u.email}), inp],
+    [["Hủy"], ["Đặt lại", "p", async () => {
+      try {
+        const j = await api("POST", `/admin/users/${u.id}/password`, {password: inp.value});
+        setTimeout(() => modal([el("h3", {textContent: "Mật khẩu mới"}), el("p", {className: "mu", textContent: "Gửi cho người dùng. Mọi phiên cũ đã bị đăng xuất. Mật khẩu sẽ không hiện lại."}), el("code", {textContent: j.password})],
+          [["Sao chép", "", async () => { try { await navigator.clipboard.writeText(j.password); toast("Đã sao chép"); } catch (_) {} }], ["Xong", "p"]]), 50);
+      } catch (e) { toast(e.message); }
+    }]]);
+}
+
+function del(u) {
+  modal([el("h3", {textContent: "Xóa tài khoản?"}), el("p", {textContent: u.email}), el("p", {className: "mu", textContent: "Xóa vĩnh viễn tài khoản cùng thống kê và khảo sát liên quan. Không hoàn tác được."})],
+    [["Hủy"], ["Xóa", "d", async () => { try { await api("DELETE", "/admin/users/" + u.id); toast("Đã xóa"); loadUsers(); loadStats(); } catch (e) { toast(e.message); } }]]);
+}
+
+async function loadBlock() {
+  try {
+    const j = await api("GET", "/admin/blocklist"); const tb = $("#bb"); tb.replaceChildren();
+    j.items.forEach(i => tb.append(el("tr", {}, el("td", {textContent: i.number}), el("td", {textContent: i.source || ""}), el("td", {textContent: fmt(i.added)}),
+      el("td", {}, el("button", {textContent: "Xóa", className: "d", onclick: async () => {
+        try { await api("DELETE", "/admin/blocklist/" + encodeURIComponent(i.number)); loadBlock(); loadStats(); } catch (e) { toast(e.message); } }})))));
+  } catch (e) { toast(e.message); }
+}
+
+const TOPIC = {"ngan-hang": "Ngân hàng", "mang-xa-hoi": "Mạng xã hội", "dien-thoai": "Điện thoại", "viec-lam": "Việc làm", "khac": "Khác"};
+const SEV = {low: "thấp", medium: "trung bình", high: "cao"};
+
+async function loadPosts() {
+  try {
+    const j = await api("GET", "/admin/posts"); const tb = $("#pb"); tb.replaceChildren();
+    j.items.forEach(p => tb.append(el("tr", {},
+      el("td", {textContent: fmt(p.ts)}),
+      el("td", {textContent: p.author + (p.email ? " (" + p.email + ")" : "")}),
+      el("td", {textContent: (p.official ? "[CHÍNH THỨC] " : "") + "[" + (TOPIC[p.topic] || p.topic) + " • mức " + (SEV[p.severity] || p.severity) + "] " + p.title + "\n" + p.body, style: "white-space:pre-wrap;min-width:240px;max-width:400px"}),
+      el("td", {textContent: p.likes}), el("td", {textContent: p.comments}), el("td", {textContent: p.reports}),
+      el("td", {}, el("span", {className: "tag " + (p.hidden ? "bad" : "ok"), textContent: p.hidden ? "Đang ẩn" : "Hiển thị"})),
+      el("td", {className: "acts"},
+        el("button", {textContent: p.hidden ? "Hiện lại" : "Ẩn", onclick: async () => {
+          try { await api("POST", `/admin/posts/${p.id}/hide`, {hidden: !p.hidden}); loadPosts(); } catch (e) { toast(e.message); } }}),
+        el("button", {textContent: "Xóa", className: "d", onclick: () => modal(
+          [el("h3", {textContent: "Xóa bài đăng?"}), el("p", {className: "mu", textContent: "Xóa vĩnh viễn cùng các bình luận của bài, không hoàn tác được."})],
+          [["Hủy"], ["Xóa", "d", async () => { try { await api("DELETE", "/admin/posts/" + p.id); loadPosts(); } catch (e) { toast(e.message); } }]]) }))
+    )));
+  } catch (e) { toast(e.message); }
+}
+
+async function loadComments() {
+  try {
+    const j = await api("GET", "/admin/comments"); const tb = $("#cb"); tb.replaceChildren();
+    j.items.forEach(c => tb.append(el("tr", {},
+      el("td", {textContent: fmt(c.ts)}),
+      el("td", {textContent: c.author + (c.email ? " (" + c.email + ")" : "")}),
+      el("td", {textContent: c.body, style: "white-space:pre-wrap;min-width:200px;max-width:360px"}),
+      el("td", {textContent: c.post, style: "max-width:200px"}),
+      el("td", {textContent: c.reports}),
+      el("td", {}, el("span", {className: "tag " + (c.hidden ? "bad" : "ok"), textContent: c.hidden ? "Đang ẩn" : "Hiển thị"})),
+      el("td", {className: "acts"},
+        el("button", {textContent: c.hidden ? "Hiện lại" : "Ẩn", onclick: async () => {
+          try { await api("POST", `/admin/comments/${c.id}/hide`, {hidden: !c.hidden}); loadComments(); } catch (e) { toast(e.message); } }}),
+        el("button", {textContent: "Xóa", className: "d", onclick: () => modal(
+          [el("h3", {textContent: "Xóa bình luận?"}), el("p", {className: "mu", textContent: "Xóa vĩnh viễn, không hoàn tác được."})],
+          [["Hủy"], ["Xóa", "d", async () => { try { await api("DELETE", "/admin/comments/" + c.id); loadComments(); } catch (e) { toast(e.message); } }]]) }))
+    )));
+  } catch (e) { toast(e.message); }
+}
+
+$("#opost").onclick = async () => {
+  try {
+    await api("POST", "/admin/posts", {title: $("#ot").value, body: $("#ob").value, topic: $("#otopic").value, severity: $("#osev").value});
+    toast("Đã đăng cảnh báo chính thức"); $("#ot").value = ""; $("#ob").value = ""; loadPosts();
+  } catch (e) { toast(e.message); }
+};
+
+const svgEl = (tag, attrs = {}, text) => {
+  const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text !== undefined) e.textContent = text;
+  return e;
+};
+
+function lineChart(box, labels, series) {
+  box.replaceChildren();
+  const W = 640, H = 220, L = 34, R = 10, T = 12, B = 26, n = labels.length;
+  const max = Math.max(1, ...series.flatMap(s => s.values)), top = max <= 5 ? 5 : Math.ceil(max / 5) * 5;
+  const X = i => L + (W - L - R) * (n === 1 ? 0.5 : i / (n - 1)), Y = v => T + (H - T - B) * (1 - v / top);
+  const svg = svgEl("svg", {viewBox: `0 0 ${W} ${H}`, width: "100%", role: "img", "aria-label": "Biểu đồ hoạt động theo ngày"});
+  for (let i = 0; i <= 4; i++) {
+    const y = T + (H - T - B) * i / 4;
+    svg.append(svgEl("line", {x1: L, x2: W - R, y1: y, y2: y, stroke: "currentColor", "stroke-opacity": "0.12"}),
+      svgEl("text", {x: L - 6, y: y + 4, "text-anchor": "end", "font-size": "10", fill: "currentColor", "fill-opacity": "0.6"}, String(Math.round(top * (4 - i) / 4))));
+  }
+  const step = Math.ceil(n / 8);
+  labels.forEach((l, i) => { if (i % step === 0 || i === n - 1) svg.append(svgEl("text", {x: X(i), y: H - 8, "text-anchor": "middle", "font-size": "10", fill: "currentColor", "fill-opacity": "0.6"}, l.slice(8) + "/" + l.slice(5, 7))); });
+  series.forEach(s => {
+    svg.append(svgEl("polyline", {points: s.values.map((v, i) => X(i) + "," + Y(v)).join(" "), fill: "none", stroke: s.color, "stroke-width": "2.2", "stroke-linejoin": "round"}));
+    s.values.forEach((v, i) => { const c = svgEl("circle", {cx: X(i), cy: Y(v), r: 3, fill: s.color}); c.append(svgEl("title", {}, labels[i] + " • " + s.name + ": " + v)); svg.append(c); });
+  });
+  box.append(svg);
+}
+
+function hbars(box, rows, color) {
+  box.replaceChildren();
+  if (!rows.length) { box.append(el("p", {className: "mu", textContent: "Chưa có dữ liệu."})); return; }
+  const mx = Math.max(1, ...rows.map(r => r[1]));
+  rows.forEach(([l, v]) => box.append(el("div", {style: "margin:9px 0"},
+    el("div", {style: "display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"}, el("span", {textContent: l}), el("b", {textContent: v})),
+    el("div", {style: "height:8px;border-radius:4px;background:" + color + ";width:" + Math.max(3, v / mx * 100) + "%"}))));
+}
+
+const KIND = {call: "Cuộc gọi", sms: "Tin nhắn SMS", voice: "Nghe qua loa ngoài", social: "Zalo / Messenger", face: "Video call giả mạo", habit: "Giao dịch bất thường"};
+const LEVEL = {"1": "cảnh báo", "2": "nguy hiểm"};
+
+function listRows(box, rows, empty) {
+  box.replaceChildren();
+  if (!rows.length) { box.append(el("p", {className: "mu", textContent: empty})); return; }
+  rows.forEach(r => box.append(el("div", {className: "li"}, ...r)));
+}
+
+async function loadDash() {
+  try {
+    const d = await api("GET", "/admin/dashboard?days=" + $("#dd").value);
+    const k = $("#kpi"); k.replaceChildren();
+    [["Tài khoản", d.totals.users, "+" + d.today.users + " hôm nay • " + d.totals.disabled + " bị khóa"],
+     ["Bài đăng", d.totals.posts, "+" + d.today.posts + " hôm nay"],
+     ["Bình luận", d.totals.comments, "+" + d.today.comments + " hôm nay"],
+     ["Số bị chặn", d.totals.blocklist, d.totals.likes + " lượt hữu ích • " + d.totals.news + " tin báo"],
+     ["Cần xử lý", d.moderation.total, d.moderation.total ? "xem mục bên dưới" : "mọi thứ ổn"]]
+      .forEach(([l, v, sub]) => k.append(el("div", {className: "card stat"}, el("b", {textContent: v}), el("span", {textContent: l}), el("div", {className: "mu", style: "font-size:12px", textContent: sub}))));
+    const S = [{name: "Tài khoản mới", color: "#60a5fa", values: d.series.users}, {name: "Bài đăng", color: "#f59e0b", values: d.series.posts},
+               {name: "Bình luận", color: "#34d399", values: d.series.comments}, {name: "Cảnh báo ẩn danh", color: "#f87171", values: d.series.events}];
+    lineChart($("#chart"), d.labels, S);
+    const lg = $("#legend"); lg.replaceChildren();
+    S.forEach(s => lg.append(el("span", {}, el("i", {className: "dot", style: "background:" + s.color}), s.name + " (" + s.values.reduce((a, b) => a + b, 0) + ")")));
+    hbars($("#bytopic"), d.topics.map(t => [TOPIC[t.topic] || t.topic, t.count]), "#60a5fa");
+    hbars($("#byevent"), d.events.map(e => [(KIND[e.kind] || e.kind) + " • " + (LEVEL[e.level] || e.level), e.count]), "#f87171");
+    const m = d.moderation, go = (t, n) => el("button", {textContent: "Xem (" + n + ")", disabled: !n, onclick: () => document.querySelector('.tab[data-t="' + t + '"]').click()});
+    listRows($("#modq"), [
+      [el("span", {textContent: "Bài đang bị ẩn"}), go("posts", m.posts_hidden)],
+      [el("span", {textContent: "Bài bị báo cáo (chưa ẩn)"}), go("posts", m.posts_reported)],
+      [el("span", {textContent: "Bình luận đang bị ẩn"}), go("comments", m.comments_hidden)],
+      [el("span", {textContent: "Bình luận bị báo cáo (chưa ẩn)"}), go("comments", m.comments_reported)]], "");
+    listRows($("#top"), d.top.map(u => [el("span", {textContent: u.email}), el("span", {className: "mu", textContent: u.posts + " bài • " + u.comments + " bình luận"})]), "Chưa có ai đóng góp.");
+    listRows($("#recent"), d.recent.map(u => [el("span", {textContent: u.email}), el("span", {className: "mu", textContent: fmt(u.created)})]), "Chưa có tài khoản nào.");
+    $("#dupd").textContent = "Cập nhật lúc " + new Date().toLocaleTimeString("vi-VN") + " • tự làm mới mỗi 30 giây khi tab này đang mở";
+  } catch (e) { toast(e.message); }
+}
+$("#dd").onchange = loadDash; $("#dr").onclick = () => { loadDash(); loadStats(); };
+setInterval(() => { if (KEY && !document.hidden && !$("#t-dash").classList.contains("hide")) loadDash(); }, 30000);
+
+async function loadNews() {
+  try {
+    const [sj, nj] = await Promise.all([api("GET", "/admin/news/sources"), api("GET", "/admin/news")]);
+    $("#nsmsg").textContent = sj.auto ? "Tự tải tin mỗi " + sj.interval + " phút." : "Tự tải tin đang TẮT (biến NEWS_ENABLED=false), chỉ tải khi bấm nút.";
+    const sb = $("#nsb"); sb.replaceChildren();
+    sj.items.forEach(sr => sb.append(el("tr", {},
+      el("td", {textContent: sr.name}), el("td", {textContent: sr.url, style: "word-break:break-all;max-width:240px"}),
+      el("td", {textContent: sr.last_run ? fmt(sr.last_run) : "—"}), el("td", {textContent: sr.status, style: "max-width:240px"}), el("td", {textContent: sr.count}),
+      el("td", {}, el("span", {className: "tag " + (sr.enabled ? "ok" : "bad"), textContent: sr.enabled ? "Đang bật" : "Đã tắt"})),
+      el("td", {className: "acts"},
+        el("button", {textContent: sr.enabled ? "Tắt" : "Bật", onclick: async () => {
+          try { await api("POST", `/admin/news/sources/${sr.id}/toggle`, {enabled: !sr.enabled}); loadNews(); } catch (e) { toast(e.message); } }}),
+        el("button", {textContent: "Xóa", className: "d", onclick: () => modal(
+          [el("h3", {textContent: "Xóa nguồn tin?"}), el("p", {className: "mu", textContent: "Xóa nguồn và toàn bộ tin đã thu thập từ nguồn này."})],
+          [["Hủy"], ["Xóa", "d", async () => { try { await api("DELETE", "/admin/news/sources/" + sr.id); loadNews(); } catch (e) { toast(e.message); } }]]) }))
+    )));
+    const nb = $("#nb"); nb.replaceChildren();
+    nj.items.forEach(n => nb.append(el("tr", {},
+      el("td", {textContent: fmt(n.ts)}), el("td", {textContent: n.source}), el("td", {textContent: TOPIC[n.topic] || n.topic}),
+      el("td", {style: "min-width:240px;max-width:420px"}, el("a", {href: n.link, target: "_blank", rel: "noopener noreferrer", textContent: n.title})),
+      el("td", {}, el("span", {className: "tag " + (n.hidden ? "bad" : "ok"), textContent: n.hidden ? "Đang ẩn" : "Hiển thị"})),
+      el("td", {className: "acts"},
+        el("button", {textContent: n.hidden ? "Hiện lại" : "Ẩn", onclick: async () => {
+          try { await api("POST", `/admin/news/${n.id}/hide`, {hidden: !n.hidden}); loadNews(); } catch (e) { toast(e.message); } }}),
+        el("button", {textContent: "Xóa", className: "d", onclick: async () => {
+          try { await api("DELETE", "/admin/news/" + n.id); loadNews(); } catch (e) { toast(e.message); } }}))
+    )));
+  } catch (e) { toast(e.message); }
+}
+$("#nsa").onclick = async () => {
+  try {
+    await api("POST", "/admin/news/sources", {name: $("#nsn").value, url: $("#nsu").value});
+    toast("Đã thêm nguồn, đang tải thử…"); $("#nsn").value = ""; $("#nsu").value = ""; loadNews(); setTimeout(loadNews, 5000);
+  } catch (e) { toast(e.message); }
+};
+$("#nsr").onclick = async () => {
+  try { const j = await api("POST", "/admin/news/refresh"); toast(j.running ? "Đang tải tin, vui lòng chờ…" : "Đã bắt đầu tải tin…"); setTimeout(loadNews, 6000); } catch (e) { toast(e.message); }
+};
+
+async function loadSurveys() {
+  try {
+    const j = await api("GET", "/admin/surveys"); const tb = $("#sb"); tb.replaceChildren();
+    j.items.forEach(i => tb.append(el("tr", {}, el("td", {textContent: fmt(i.ts)}), el("td", {textContent: JSON.stringify(i.answers), style: "white-space:normal"}))));
+  } catch (e) { toast(e.message); }
+}
+
+$("#addn").onclick = async () => {
+  const nums = $("#nums").value.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
+  if (!nums.length) return toast("Chưa nhập số nào");
+  try { const j = await api("POST", "/admin/blocklist", {numbers: nums, source: $("#src").value || "admin"});
+    toast(`Đã thêm ${j.added} số` + (j.invalid.length ? `, ${j.invalid.length} số không hợp lệ` : "")); $("#nums").value = ""; loadBlock(); loadStats(); }
+  catch (e) { toast(e.message); }
+};
+
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === b));
+  ["dash", "users", "block", "posts", "comments", "news", "survey"].forEach(t => $("#t-" + t).classList.toggle("hide", t !== b.dataset.t));
+  ({dash: loadDash, users: loadUsers, block: loadBlock, posts: loadPosts, comments: loadComments, news: loadNews, survey: loadSurveys})[b.dataset.t]();
+});
+
+let qt; $("#q").oninput = () => { clearTimeout(qt); qt = setTimeout(loadUsers, 300); };
+$("#rf").onclick = () => { loadUsers(); loadStats(); };
+$("#go").onclick = () => { KEY = $("#key").value; sessionStorage.setItem("ak", KEY); $("#lerr").textContent = ""; enter(); };
+$("#key").onkeydown = e => { if (e.key === "Enter") $("#go").click(); };
+$("#out").onclick = () => { sessionStorage.removeItem("ak"); location.reload(); };
+if (KEY) enter();
+</script>
+</body>
+</html>
