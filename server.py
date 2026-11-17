@@ -997,7 +997,8 @@ def optional_user():
 
 POST_SELECT = ("SELECT p.id,p.user_id,p.author,p.title,p.body,p.topic,p.severity,p.official,p.cat,p.ts,"
                "(SELECT COUNT(*) FROM post_likes l WHERE l.post_id=p.id) lk,"
-               "(SELECT COUNT(*) FROM comments c WHERE c.post_id=p.id AND c.hidden=0) cm,"               "EXISTS(SELECT 1 FROM post_likes l WHERE l.post_id=p.id AND l.user_id=?) me FROM posts p ")
+               "(SELECT COUNT(*) FROM comments c WHERE c.post_id=p.id AND c.hidden=0) cm,"
+               "EXISTS(SELECT 1 FROM post_likes l WHERE l.post_id=p.id AND l.user_id=?) me FROM posts p ")
 
 
 def post_dict(r, uid):
@@ -1996,7 +1997,8 @@ def bank_list():
         payload = json.loads(raw.decode("utf-8"))
         banks = payload.get("data") if isinstance(payload, dict) else None
         if not isinstance(banks, list):
-            raise ApiError("Nguồn dữ liệu ngân hàng trả về không hợp lệ", 502)        safe = []
+            raise ApiError("Nguồn dữ liệu ngân hàng trả về không hợp lệ", 502)
+        safe = []
         for bank in banks:
             if not isinstance(bank, dict):
                 continue
