@@ -1855,7 +1855,7 @@ def monitor_conversation_api():
     if not isinstance(previous_memory, dict):
         raise ApiError("Bộ nhớ ngữ cảnh không hợp lệ.")
     previous_memory = normalize_conversation_memory(previous_memory)
-    if len(json.dumps(previous_memory, ensure_ascii=False)) > 3000:
+    if len(json.dumps(previous_memory, ensure_ascii=False)) > 6000:
         raise ApiError("Bộ nhớ ngữ cảnh vượt giới hạn cho phép.")
 
     lines = []
