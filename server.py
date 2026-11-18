@@ -55,7 +55,7 @@ _AI_STATUS = {
 }
 
 def set_gemini_failure(reason, code=None):
-    _GEMINI_LOCAL.failure_reason = str(reason or "Gemini không trả kết quả hợp lệ.")[:240]
+    _GEMINI_LOCAL.failure_reason = str(reason)[:240] if reason else None
     _GEMINI_LOCAL.provider_code = int(code) if code is not None else None
 
 def gemini_failure_reason():
@@ -120,6 +120,7 @@ DB_PATH = os.environ.get("DB_PATH", str(DATA_DIR / "scamshield.db"))
 ADMIN_KEY = os.environ.get("ADMIN_KEY", "")               # để trống = tắt API quản trị
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()  # API key Google AI Studio; giữ bí mật
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash").strip()
+GEMINI_FALLBACK_MODEL = os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite").strip()
 # Text AI uses Google Gemini when GEMINI_API_KEY is configured; otherwise local rules remain available.
 VIETQR_CLIENT_ID = os.environ.get("VIETQR_CLIENT_ID", "").strip()
 VIETQR_API_KEY = os.environ.get("VIETQR_API_KEY", "").strip()
@@ -1765,14 +1766,19 @@ def admin_dashboard():
 
 # ----------------------------------------------------------------- AI: Google Gemini (tùy chọn)
 def gemini(system, content, max_tokens=700):
-    """Call Gemini and keep a safe, request-local diagnostic for the admin activity log."""
+    """Call Gemini with bounded retry and a lighter model fallback for transient capacity failures."""
     set_gemini_failure(None, None)
     if not GEMINI_API_KEY:
         set_gemini_failure("Chưa cấu hình Gemini API Key.")
         return None
-    if not re.fullmatch(r"[A-Za-z0-9._-]+", GEMINI_MODEL):
+
+    if not GEMINI_MODEL or not re.fullmatch(r"[A-Za-z0-9._-]+", GEMINI_MODEL):
         app.logger.error("GEMINI_MODEL không hợp lệ")
-        set_gemini_failure("Tên model Gemini không hợp lệ.")
+        set_gemini_failure("Tên model Gemini chính không hợp lệ.")
+        return None
+    if GEMINI_FALLBACK_MODEL and not re.fullmatch(r"[A-Za-z0-9._-]+", GEMINI_FALLBACK_MODEL):
+        app.logger.error("GEMINI_FALLBACK_MODEL không hợp lệ")
+        set_gemini_failure("Tên model Gemini dự phòng không hợp lệ.")
         return None
 
     if isinstance(content, list):
@@ -1800,55 +1806,87 @@ def gemini(system, content, max_tokens=700):
         "contents": [{"role": "user", "parts": parts}],
         "generationConfig": {"maxOutputTokens": max(128, min(int(max_tokens), 4096))}
     }
-    url = "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent"
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"content-type": "application/json", "x-goog-api-key": GEMINI_API_KEY},
-        method="POST"
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=45) as response:
-            result = json.load(response)
-        candidates = result.get("candidates") or []
-        if not candidates:
-            app.logger.warning("Gemini không trả về candidate (có thể bị chặn bởi safety settings)")
-            set_gemini_failure("Gemini không trả kết quả; có thể phản hồi đã bị bộ lọc an toàn chặn.")
-            return None
-        response_parts = (candidates[0].get("content") or {}).get("parts") or []
-        answer = "".join(str(part.get("text", "")) for part in response_parts if part.get("text"))
-        if not answer.strip():
-            set_gemini_failure("Gemini trả về phản hồi rỗng.")
-            return None
-        return answer.strip()
-    except urllib.error.HTTPError as exc:
+    reasons = {
+        400: "Gemini từ chối yêu cầu (HTTP 400). Kiểm tra định dạng nội dung gửi lên.",
+        401: "Gemini từ chối API Key (HTTP 401). Kiểm tra lại khóa API.",
+        403: "Gemini không cấp quyền truy cập (HTTP 403). Kiểm tra quyền API hoặc model.",
+        404: "Không tìm thấy model Gemini (HTTP 404). Kiểm tra tên model đang cấu hình.",
+        429: "Gemini đang giới hạn số lượt gọi (HTTP 429). Kiểm tra hạn mức rồi thử lại sau.",
+        500: "Gemini gặp sự cố nội bộ (HTTP 500).",
+        502: "Cổng dịch vụ Gemini gặp lỗi (HTTP 502).",
+        503: "Gemini tạm thời quá tải (HTTP 503 / UNAVAILABLE).",
+        504: "Gemini phản hồi quá thời gian (HTTP 504 / DEADLINE_EXCEEDED)."
+    }
+    retryable_codes = {500, 502, 503, 504}
+
+    def call_model(model):
+        url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent"
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={"content-type": "application/json", "x-goog-api-key": GEMINI_API_KEY},
+            method="POST"
+        )
         try:
-            detail = exc.read(1200).decode("utf-8", errors="replace")
-        except Exception:
-            detail = ""
-        reasons = {
-            400: "Gemini từ chối yêu cầu (HTTP 400). Kiểm tra định dạng nội dung gửi lên.",
-            401: "Gemini từ chối API Key (HTTP 401). Kiểm tra lại khóa API.",
-            403: "Gemini không cấp quyền truy cập (HTTP 403). Kiểm tra quyền API hoặc model.",
-            404: "Không tìm thấy model Gemini (HTTP 404). Kiểm tra tên model đang cấu hình.",
-            429: "Gemini đang giới hạn số lượt gọi (HTTP 429). Chờ hạn mức được làm mới rồi thử lại.",
-            500: "Gemini gặp sự cố nội bộ (HTTP 500). Thử lại sau.",
-            502: "Cổng dịch vụ Gemini gặp lỗi (HTTP 502). Thử lại sau.",
-            503: "Gemini tạm thời quá tải (HTTP 503 / UNAVAILABLE). Đây là lỗi phía nhà cung cấp; thử lại sau.",
-            504: "Gemini phản hồi quá thời gian (HTTP 504). Thử lại sau."
-        }
-        reason = reasons.get(exc.code, f"Gemini trả lỗi HTTP {exc.code}.")
-        set_gemini_failure(reason, exc.code)
-        app.logger.warning("Gemini HTTP %s: %s", exc.code, detail[:500])
+            with urllib.request.urlopen(req, timeout=20) as response:
+                result = json.load(response)
+            candidates = result.get("candidates") or []
+            if not candidates:
+                return None, "Gemini không trả kết quả; có thể phản hồi đã bị bộ lọc an toàn chặn.", None, False
+            response_parts = (candidates[0].get("content") or {}).get("parts") or []
+            answer = "".join(str(part.get("text", "")) for part in response_parts if part.get("text"))
+            if not answer.strip():
+                return None, "Gemini trả về phản hồi rỗng.", None, False
+            return answer.strip(), None, None, False
+        except urllib.error.HTTPError as exc:
+            try:
+                detail = exc.read(1200).decode("utf-8", errors="replace")
+            except Exception:
+                detail = ""
+            reason = reasons.get(exc.code, f"Gemini trả lỗi HTTP {exc.code}.")
+            app.logger.warning("Gemini model %s HTTP %s: %s", model, exc.code, detail[:350])
+            return None, reason, exc.code, exc.code in retryable_codes
+        except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+            app.logger.warning("Không kết nối được Gemini model %s: %s", model, type(exc).__name__)
+            return None, "Không kết nối được Gemini: lỗi mạng hoặc hết thời gian chờ.", None, True
+        except (ValueError, json.JSONDecodeError):
+            app.logger.warning("Gemini model %s trả dữ liệu không đọc được", model)
+            return None, "Gemini trả dữ liệu không đọc được.", None, False
+
+    # Primary model: one initial attempt and one bounded retry after a short backoff.
+    answer, failure, code, retryable = call_model(GEMINI_MODEL)
+    if answer:
+        set_gemini_failure(None, None)
+        _GEMINI_LOCAL.model_used = GEMINI_MODEL
+        return answer
+    if not retryable:
+        set_gemini_failure(failure, code)
         return None
-    except (urllib.error.URLError, TimeoutError) as exc:
-        set_gemini_failure("Không kết nối được Gemini: lỗi mạng hoặc hết thời gian chờ.")
-        app.logger.warning("Không kết nối được Gemini: %s", type(exc).__name__)
-        return None
-    except (ValueError, json.JSONDecodeError):
-        set_gemini_failure("Gemini trả dữ liệu không đọc được.")
-        app.logger.warning("Gemini trả dữ liệu không đọc được")
-        return None
+
+    app.logger.warning("Gemini model %s gặp lỗi tạm thời; thử lại một lần.", GEMINI_MODEL)
+    time.sleep(1.0)
+    answer, retry_failure, retry_code, retryable = call_model(GEMINI_MODEL)
+    if answer:
+        set_gemini_failure(None, None)
+        _GEMINI_LOCAL.model_used = GEMINI_MODEL
+        return answer
+    failure, code = retry_failure, retry_code
+
+    # If still unavailable, try one lightweight stable fallback model.
+    fallback = GEMINI_FALLBACK_MODEL
+    if retryable and fallback and fallback != GEMINI_MODEL:
+        app.logger.warning("Gemini model %s vẫn lỗi; chuyển sang model dự phòng %s.", GEMINI_MODEL, fallback)
+        time.sleep(0.5)
+        answer, fallback_failure, fallback_code, _ = call_model(fallback)
+        if answer:
+            set_gemini_failure(None, None)
+            _GEMINI_LOCAL.model_used = fallback
+            app.logger.warning("Gemini đã xử lý thành công bằng model dự phòng %s.", fallback)
+            return answer
+        failure, code = fallback_failure, fallback_code
+
+    set_gemini_failure(failure or "Gemini không trả kết quả sau khi thử lại.", code)
+    return None
 
 
 def text_ai(system, content, max_tokens=700):
