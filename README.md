@@ -54,11 +54,12 @@ Chỉ dùng HTTPS khi kết nối từ điện thoại. Nếu chỉ chạy `pyth
 
 ## 4. Cấu hình Gemini và Theo dõi chat
 
-Máy chủ dùng Google Gemini cho các tính năng AI văn bản. Cấu hình hai biến sau trong môi trường chạy server hoặc file `.env` riêng trên máy chủ; không đưa khóa thật lên GitHub:
+Máy chủ dùng Google Gemini cho các tính năng AI văn bản. Khi model chính gặp timeout hoặc HTTP 500/502/503/504, server tự thử lại một lần sau 1 giây rồi thử model dự phòng GEMINI_FALLBACK_MODEL (mặc định gemini-3.5-flash-lite) thêm một lần. Lỗi khóa/quyền/model/hạn mức như 401/403/404/429 không bị lặp vô ích. Mỗi lượt gọi có timeout 20 giây. Cấu hình hai biến sau trong môi trường chạy server hoặc file `.env` riêng trên máy chủ; không đưa khóa thật lên GitHub:
 
 ```env
 GEMINI_API_KEY=KHOA_GOOGLE_AI_STUDIO_CUA_BAN
 GEMINI_MODEL=gemini-3.8-flash
+GEMINI_FALLBACK_MODEL=gemini-3.5-flash-lite
 ```
 
 Nếu không có `GEMINI_API_KEY`, các bộ quy tắc cục bộ vẫn hoạt động, nhưng các yêu cầu phân tích Gemini trả về lỗi cấu hình rõ ràng.
