@@ -54,45 +54,47 @@ Chỉ dùng HTTPS khi kết nối từ điện thoại. Nếu chỉ chạy `pyth
 
 ## 4. Cấu hình OpenRouter miễn phí và Theo dõi chat
 
-Mặc định server dùng **OpenRouter Free Models Router** với model cố định \`openrouter/free\`.
-Server gọi API tương thích OpenAI tại \`https://openrouter.ai/api/v1/chat/completions\`; không cần SDK bổ sung.
+Mặc định server dùng **OpenRouter Free Models Router** với model cố định `openrouter/free`.
+Server gọi API tương thích OpenAI tại `https://openrouter.ai/api/v1/chat/completions`; không cần SDK bổ sung.
 OpenRouter tự chọn model miễn phí phù hợp với loại đầu vào, bao gồm văn bản hoặc ảnh. Mỗi phản hồi có trường
-\`model\` cho biết model miễn phí thực tế đã xử lý yêu cầu; thông tin này xuất hiện trong dashboard quản trị.
+`model` cho biết model miễn phí thực tế đã xử lý yêu cầu; thông tin này xuất hiện trong dashboard quản trị.
 
-Cấu hình hai biến trong môi trường chạy server hoặc file \`.env\` riêng trên máy chủ:
+Trên Windows có thể dùng `chay-openrouter.ps1` cùng thư mục `server.py`; launcher hỏi OpenRouter API Key và Admin Key ở chế độ ẩn rồi chạy server. File này không ghi đè `chay.ps1` hiện tại.
 
-\`\`\`env
+Cấu hình hai biến trong môi trường chạy server hoặc file `.env` riêng trên máy chủ:
+
+```env
 AI_PROVIDER=openrouter
 OPENROUTER_API_KEY=KHOA_OPENROUTER_CUA_BAN
-\`\`\`
+```
 
 **Giới hạn của gói miễn phí:** OpenRouter hiện công bố mức mặc định 20 yêu cầu/phút và 50 yêu cầu/ngày cho free variants
 (không mua credit); yêu cầu thất bại cũng có thể tính vào hạn mức ngày. Hạn mức có thể thay đổi theo tài khoản.
 Khi gặp HTTP 429/503, ScamShield ghi rõ lý do rồi dùng bộ quy tắc cục bộ. Server không lặp gọi nhiều lần và không tự chuyển
 sang model trả phí. OpenRouter tự thực hiện định tuyến nhà cung cấp ở phía họ.
 
-\`GEMINI_API_KEY\`, \`GEMINI_MODEL\` và \`GEMINI_FALLBACK_MODEL\` vẫn được giữ cho trường hợp quản trị viên chủ động
-chọn \`AI_PROVIDER=gemini\`. Chúng **không được gọi tự động** khi \`AI_PROVIDER=openrouter\`, kể cả khi thiếu OpenRouter Key.
+`GEMINI_API_KEY`, `GEMINI_MODEL` và `GEMINI_FALLBACK_MODEL` vẫn được giữ cho trường hợp quản trị viên chủ động
+chọn `AI_PROVIDER=gemini`. Chúng **không được gọi tự động** khi `AI_PROVIDER=openrouter`, kể cả khi thiếu OpenRouter Key.
 
 ### API phân tích ngữ cảnh hội thoại
 
-\`POST /api/monitor/conversation\` yêu cầu đăng nhập và nhận tối đa 12 tin nhắn thuộc **một cuộc trò chuyện đã chọn**.
+`POST /api/monitor/conversation` yêu cầu đăng nhập và nhận tối đa 12 tin nhắn thuộc **một cuộc trò chuyện đã chọn**.
 Giao thức Android không thay đổi:
 
-\`\`\`json
+```json
 {
   "messages": [
     {"sender": "Người gửi", "text": "Nội dung tin nhắn", "timestamp": 1794900000000}
   ]
 }
-\`\`\`
+```
 
-Máy chủ trả về \`risk_score\`, \`risk_level\`, \`summary\`, \`evidence\`, \`recommended_action\`, \`confidence\` và
-\`conversation_memory\`. App lưu bộ nhớ thread ở thiết bị và gửi lại ở lần phân tích sau; server không lưu transcript
+Máy chủ trả về `risk_score`, `risk_level`, `summary`, `evidence`, `recommended_action`, `confidence` và
+`conversation_memory`. App lưu bộ nhớ thread ở thiết bị và gửi lại ở lần phân tích sau; server không lưu transcript
 hoặc bộ nhớ hội thoại. Endpoint giới hạn 12 yêu cầu/phút/tài khoản và transcript tối đa 6.000 ký tự.
 App chỉ gọi endpoint sau khi người dùng đồng ý bật phân tích tự động hoặc chủ động bấm phân tích.
 
-Các endpoint \`/api/chat\`, \`/api/analyze/text\`, \`/api/analyze/media\` và \`/api/monitor/conversation\` giữ nguyên
+Các endpoint `/api/chat`, `/api/analyze/text`, `/api/analyze/media` và `/api/monitor/conversation` giữ nguyên
 request/response Android hiện tại. Chỉ nhà cung cấp AI phía server thay đổi. Nếu dịch vụ miễn phí không khả dụng,
 bộ quy tắc cục bộ vẫn có thể tạo kết quả dự phòng. Kết quả AI là chỉ báo rủi ro, không phải kết luận chắc chắn.
 
@@ -191,20 +193,20 @@ Server tự tải RSS của các báo định kỳ (mặc định 30 phút, bi�
 
 Chat gia đình dùng tài khoản ScamShield hiện có. Mỗi thành viên đăng nhập bằng tài khoản riêng; người tạo nhóm là trưởng nhóm. Thành viên trong nhóm có thể tạo mã mời để người thân nhập vào tham gia.
 
-Các API đều yêu cầu \`Authorization: Bearer <token>\`:
-- \`GET /api/family/chats\`: danh sách nhóm, số thành viên, tin nhắn cuối và số tin chưa đọc.
-- \`POST /api/family/chats\`: tạo nhóm, body \`{"name":"Gia đình mình"}\`.
-- \`POST /api/family/chats/join\`: tham gia bằng body \`{"invite_code":"..."}\`.
-- \`POST /api/family/chats/{id}/invite\`: tạo mã mời ngẫu nhiên, hết hạn sau 7 ngày, tối đa 20 lượt. Database chỉ lưu SHA-256 của mã.
-- \`GET /api/family/chats/{id}/members\`: danh sách thành viên.
-- \`GET /api/family/chats/{id}/messages?limit=50\`: tải lịch sử tin nhắn và cập nhật mốc đã đọc.
-- \`POST /api/family/chats/{id}/messages\`: gửi body \`{"body":"..." }\`, tối đa 2.000 ký tự.
-- \`POST /api/family/chats/{id}/leave\`: rời nhóm; nếu trưởng nhóm rời, quyền trưởng nhóm chuyển cho thành viên vào sớm nhất.
-- \`DELETE /api/family/chats/{id}\`: chỉ trưởng nhóm được xóa nhóm và toàn bộ lịch sử.
+Các API đều yêu cầu `Authorization: Bearer <token>`:
+- `GET /api/family/chats`: danh sách nhóm, số thành viên, tin nhắn cuối và số tin chưa đọc.
+- `POST /api/family/chats`: tạo nhóm, body `{"name":"Gia đình mình"}`.
+- `POST /api/family/chats/join`: tham gia bằng body `{"invite_code":"..."}`.
+- `POST /api/family/chats/{id}/invite`: tạo mã mời ngẫu nhiên, hết hạn sau 7 ngày, tối đa 20 lượt. Database chỉ lưu SHA-256 của mã.
+- `GET /api/family/chats/{id}/members`: danh sách thành viên.
+- `GET /api/family/chats/{id}/messages?limit=50`: tải lịch sử tin nhắn và cập nhật mốc đã đọc.
+- `POST /api/family/chats/{id}/messages`: gửi body `{"body":"..." }`, tối đa 2.000 ký tự.
+- `POST /api/family/chats/{id}/leave`: rời nhóm; nếu trưởng nhóm rời, quyền trưởng nhóm chuyển cho thành viên vào sớm nhất.
+- `DELETE /api/family/chats/{id}`: chỉ trưởng nhóm được xóa nhóm và toàn bộ lịch sử.
 
 **Quyền riêng tư và giới hạn:** máy chủ kiểm tra membership ở từng lần đọc/gửi; người ngoài nhóm nhận 404. Giới hạn 30 tin/phút và 1.000 tin/ngày cho mỗi tài khoản. App Android hiện đồng bộ bằng cách hỏi máy chủ định kỳ khoảng 6 giây khi phòng chat đang mở.
 
-Tin nhắn được lưu trong SQLite để đồng bộ giữa các thiết bị. Nội dung truyền qua HTTPS nhưng **chưa có mã hóa đầu cuối (E2EE)**; người vận hành máy chủ có thể truy cập dữ liệu lưu trữ. Không gửi OTP, mật khẩu, thông tin thẻ hoặc dữ liệu riêng tư nhạy cảm vào nhóm. Sao lưu thư mục \`data/\` theo chính sách bảo mật của bạn.
+Tin nhắn được lưu trong SQLite để đồng bộ giữa các thiết bị. Nội dung truyền qua HTTPS nhưng **chưa có mã hóa đầu cuối (E2EE)**; người vận hành máy chủ có thể truy cập dữ liệu lưu trữ. Không gửi OTP, mật khẩu, thông tin thẻ hoặc dữ liệu riêng tư nhạy cảm vào nhóm. Sao lưu thư mục `data/` theo chính sách bảo mật của bạn.
 
 ## 5. Dùng trong app
 
