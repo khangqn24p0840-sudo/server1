@@ -503,10 +503,15 @@ def configured_ai_model():
 
 
 def ai_provider_used():
-    return getattr(_GEMINI_LOCAL, "provider_used", None) or configured_ai_provider()
+    configured = configured_ai_provider()
+    if configured == "rules":
+        return "rules"
+    return getattr(_GEMINI_LOCAL, "provider_used", None) or configured
 
 
 def ai_model_used():
+    if configured_ai_provider() == "rules":
+        return None
     return getattr(_GEMINI_LOCAL, "model_used", None) or configured_ai_model()
 
 
@@ -1903,6 +1908,8 @@ def openrouter_generate(system, content, max_tokens=700):
             error_body = {}
         error = error_body.get("error") or {}
         detail = str(error.get("message") or "")[:180]
+        if OPENROUTER_API_KEY:
+            detail = detail.replace(OPENROUTER_API_KEY, "[API Key đã ẩn]")
         reason = reasons.get(exc.code, f"OpenRouter trả lỗi HTTP {exc.code}.")
         if detail and exc.code not in (401, 402, 403):
             reason += " Chi tiết: " + detail
@@ -1921,8 +1928,10 @@ def openrouter_generate(system, content, max_tokens=700):
 
 # ----------------------------------------------------------------- AI: Google Gemini (tùy chọn)
 def gemini(system, content, max_tokens=700):
-    """Call Gemini with bounded retry and a lighter model fallback for transient capacity failures."""
+    """Call Gemini only when AI_PROVIDER=gemini was selected explicitly."""
     set_gemini_failure(None, None)
+    _GEMINI_LOCAL.provider_used = "gemini"
+    _GEMINI_LOCAL.model_used = GEMINI_MODEL
     if not GEMINI_API_KEY:
         set_gemini_failure("Chưa cấu hình Gemini API Key.")
         return None
