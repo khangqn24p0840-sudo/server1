@@ -2023,7 +2023,10 @@ def analyze_text():
     text = text[:MAX_TEXT]
 
     h_risk, h_reasons = heuristic_text(text)
+    ai_started = time.perf_counter()
     ai = parse_json(text_ai(TEXT_SYSTEM, f"<noi_dung>\n{text}\n</noi_dung>"))
+    ai_ok = isinstance(ai, dict) and isinstance(ai.get("risk"), (int, float))
+    record_ai_status("chat", "success" if ai_ok else "failure", ai_started)
 
     ai_advice = ""
     if isinstance(ai, dict) and isinstance(ai.get("risk"), (int, float)):
@@ -2201,10 +2204,13 @@ def analyze_media():
         score = 0.25
         notes.append("Ảnh không có thông tin chụp (EXIF), có thể đã bị xử lý hoặc gửi qua mạng xã hội")
 
+    ai_started = time.perf_counter()
     ai = parse_json(gemini(MEDIA_SYSTEM, [
         {"type": "image", "source": {"type": "base64", "media_type": mime, "data": base64.b64encode(img).decode()}},
         {"type": "text", "text": "Đánh giá ảnh này."}], max_tokens=300))
-    if ai and isinstance(ai.get("fake_probability"), (int, float)):
+    ai_ok = isinstance(ai, dict) and isinstance(ai.get("fake_probability"), (int, float))
+    record_ai_status("chat", "success" if ai_ok else "failure", ai_started)
+    if ai_ok:
         p = max(0.0, min(1.0, float(ai["fake_probability"])))
         score = max(score, 0.6 * p + 0.4 * score) if score else p
         if ai.get("note"):
