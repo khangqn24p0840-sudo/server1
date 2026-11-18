@@ -52,7 +52,7 @@ class ConversationMonitorNormalizationTests(unittest.TestCase):
             "risk_score": 44,
             "conversation_memory": {
                 "summary": "x" * 1600,
-                "key_facts": ["fact"] * 12,
+                "key_facts": [f"fact {index}" for index in range(12)],
                 "behavior_patterns": ["pattern"],
                 "open_questions": ["question"],
             },
