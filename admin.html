@@ -5,20 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ScamShield – Quản trị</title>
 <style>
-:root{--bg:#f5f6f8;--card:#fff;--tx:#1a1d23;--mu:#6b7280;--bd:#e3e6eb;--pr:#2563eb;--dg:#dc2626;--ok:#16a34a;--wa:#d97706}
-@media (prefers-color-scheme:dark){:root{--bg:#14161a;--card:#1d2026;--tx:#e8eaee;--mu:#9aa1ad;--bd:#2c313a;--pr:#60a5fa;--dg:#f87171;--ok:#4ade80;--wa:#fbbf24}}
+:root{--bg:#090d25;--card:#171d43;--tx:#edf2ff;--mu:#a5b1d3;--bd:#2b3566;--pr:#536dff;--dg:#ff738b;--ok:#35d6a0;--wa:#ffc36b}
 *{box-sizing:border-box}
-body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx)}
-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--card);border-bottom:1px solid var(--bd)}
+body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:radial-gradient(ellipse at 80% 0%,#21145c 0%,var(--bg) 55%);color:var(--tx)}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:rgba(20,26,61,.96);border-bottom:1px solid var(--bd);box-shadow:0 8px 30px #0004}
 h1{font-size:18px;margin:0}
 main{max-width:1000px;margin:0 auto;padding:20px}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 12px 30px #0003}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
 .stat b{display:block;font-size:26px}.stat span{color:var(--mu);font-size:13px}
 .tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
-.tab{padding:8px 14px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--tx);cursor:pointer;font:inherit}
-.tab.on{background:var(--pr);border-color:var(--pr);color:#fff}
-input,textarea,select{font:inherit;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);width:100%}
+.tab{padding:8px 14px;border:1px solid var(--bd);border-radius:8px;background:#1b2450;color:var(--tx);cursor:pointer;font:inherit}
+.tab.on{background:linear-gradient(100deg,#3546c9,#5a80ff);border-color:var(--pr);color:#fff}
+input,textarea,select{font:inherit;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;background:#101735;color:var(--tx);width:100%}
 textarea{min-height:90px}
 button{font:inherit;padding:7px 12px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);cursor:pointer}
 button:hover{border-color:var(--pr)}
@@ -68,6 +67,7 @@ code{background:var(--bg);padding:6px 10px;border-radius:6px;display:block;margi
       <button class="tab" data-t="comments">Bình luận</button>
       <button class="tab" data-t="news">Tin báo chí</button>
       <button class="tab" data-t="survey">Khảo sát</button>
+      <button class="tab" data-t="ai">AI & Hệ thống</button>
     </div>
 
     <section id="t-dash">
@@ -126,6 +126,18 @@ code{background:var(--bg);padding:6px 10px;border-radius:6px;display:block;margi
       <div class="tw"><table><thead><tr><th>Báo</th><th>Địa chỉ RSS</th><th>Lần chạy gần nhất</th><th>Kết quả</th><th>Tin</th><th>Trạng thái</th><th></th></tr></thead><tbody id="nsb"></tbody></table></div>
       <h3 style="margin:16px 0 8px">Tin đã thu thập</h3>
       <div class="tw"><table><thead><tr><th>Ngày đăng</th><th>Báo</th><th>Chủ đề</th><th>Tiêu đề (bấm để mở bài gốc)</th><th>Trạng thái</th><th></th></tr></thead><tbody id="nb"></tbody></table></div>
+    </section>
+
+    <section id="t-ai" class="hide">
+      <div class="row"><b>Giám sát AI & máy chủ</b><span style="flex:1"></span><span class="mu" id="ai-updated">Đang tải…</span><button id="ai-refresh">Làm mới</button></div>
+      <div class="stats" id="ai-cards"></div>
+      <div class="grid2">
+        <div class="card"><h3>Gemini – nhà cung cấp AI</h3><div id="ai-gemini"></div></div>
+        <div class="card"><h3>Theo dõi chat – phân tích hội thoại</h3><div id="ai-monitor"></div></div>
+        <div class="card"><h3>Chatbot thông thường</h3><div id="ai-chat"></div></div>
+        <div class="card"><h3>Máy chủ & model ML</h3><div id="ai-system"></div></div>
+      </div>
+      <p class="mu">Số liệu yêu cầu được đếm từ lúc server khởi động lại gần nhất. Server không lưu nội dung tin nhắn, transcript, API key hoặc bộ nhớ hội thoại trong bảng giám sát này. "Đã cấu hình" không đồng nghĩa lần gọi gần nhất thành công.</p>
     </section>
 
     <section id="t-survey" class="card hide">
@@ -417,9 +429,47 @@ $("#addn").onclick = async () => {
 
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === b));
-  ["dash", "users", "block", "posts", "comments", "news", "survey"].forEach(t => $("#t-" + t).classList.toggle("hide", t !== b.dataset.t));
-  ({dash: loadDash, users: loadUsers, block: loadBlock, posts: loadPosts, comments: loadComments, news: loadNews, survey: loadSurveys})[b.dataset.t]();
+  ["dash", "users", "block", "posts", "comments", "news", "survey", "ai"].forEach(t => $("#t-" + t).classList.toggle("hide", t !== b.dataset.t));
+  ({dash: loadDash, users: loadUsers, block: loadBlock, posts: loadPosts, comments: loadComments, news: loadNews, survey: loadSurveys, ai: loadAiStatus})[b.dataset.t]();
 });
+
+function statusLine(label, value, good) {
+  return el("div", {className:"li"}, el("span",{textContent:label}), el("span",{className:"tag "+(good ? "ok":"bad"),textContent:value}));
+}
+function renderUsage(box, data, emptyLabel) {
+  box.replaceChildren();
+  box.append(statusLine("Trạng thái lần gần nhất", data.last_result || emptyLabel, data.last_result === "Thành công"));
+  box.append(statusLine("Tổng yêu cầu", String(data.requests || 0), true));
+  box.append(statusLine("Thành công", String(data.success || 0), true));
+  box.append(statusLine("Thất bại", String(data.failures || 0), !(data.failures > 0)));
+  box.append(statusLine("Lần hoạt động gần nhất", data.last_at ? fmt(data.last_at) : "Chưa có", !!data.last_at));
+  box.append(statusLine("Thời gian xử lý gần nhất", data.last_ms == null ? "—" : data.last_ms + " ms", data.last_ms != null));
+}
+async function loadAiStatus() {
+  try {
+    const d = await api("GET", "/admin/ai-status");
+    const cards = $("#ai-cards"); cards.replaceChildren();
+    [["Gemini", d.gemini.configured ? "Đã cấu hình" : "Chưa cấu hình", d.gemini.configured],
+     ["Theo dõi chat", d.monitor_chat.success + " thành công", d.monitor_chat.success > 0 && d.monitor_chat.last_result === "Thành công"],
+     ["Chatbot", d.normal_chat.success + " phản hồi AI", d.normal_chat.last_result === "Thành công"],
+     ["Model ML", d.ml_model.available ? "Đã có file" : "Chưa có file", d.ml_model.available]]
+      .forEach(([name,value,ok]) => cards.append(el("div",{className:"card stat"},el("b",{textContent:value}),el("span",{textContent:name}))));
+    const g=$("#ai-gemini"); g.replaceChildren();
+    g.append(statusLine("Nhà cung cấp",d.gemini.provider.toUpperCase(),d.gemini.configured));
+    g.append(statusLine("Model",d.gemini.model || "Không dùng Gemini",d.gemini.configured));
+    g.append(statusLine("AI media",d.media_ai.configured ? "Đã bật theo cấu hình" : "Chưa bật",d.media_ai.configured));
+    renderUsage($("#ai-monitor"),d.monitor_chat,"Chưa có lượt phân tích");
+    renderUsage($("#ai-chat"),d.normal_chat,"Chưa có lượt chat");
+    const sys=$("#ai-system"); sys.replaceChildren();
+    sys.append(statusLine("Máy chủ",d.server.ok ? "Đang hoạt động" : "Không phản hồi",d.server.ok));
+    sys.append(statusLine("TFLite",d.ml_model.available ? "Có sẵn" : "Thiếu file",d.ml_model.available));
+    sys.append(statusLine("Dung lượng model",d.ml_model.available ? (Math.round(d.ml_model.bytes/1024)+" KB") : "—",d.ml_model.available));
+    sys.append(statusLine("Phiên bản model",d.ml_model.version || "Chưa đặt",d.ml_model.available));
+    $("#ai-updated").textContent = "Cập nhật " + new Date().toLocaleTimeString("vi-VN");
+  } catch(e) { toast("Không tải được trạng thái AI: " + e.message); }
+}
+$("#ai-refresh").onclick = loadAiStatus;
+setInterval(() => { if (KEY && !document.hidden && !$("#t-ai").classList.contains("hide")) loadAiStatus(); }, 10000);
 
 let qt; $("#q").oninput = () => { clearTimeout(qt); qt = setTimeout(loadUsers, 300); };
 $("#rf").onclick = () => { loadUsers(); loadStats(); };
