@@ -52,35 +52,50 @@ Có thể upload trực tiếp qua API quản trị:
 
 Chỉ dùng HTTPS khi kết nối từ điện thoại. Nếu chỉ chạy `python server.py` trên máy tính để thử, dùng Cloudflare Tunnel hoặc hạ tầng HTTPS tương đương.
 
-## 4. Cấu hình Gemini và Theo dõi chat
+## 4. Cấu hình OpenRouter miễn phí và Theo dõi chat
 
-Máy chủ dùng Google Gemini cho các tính năng AI văn bản. Khi model chính (mặc định gemini-3.5-flash-lite) gặp timeout hoặc HTTP 500/502/503/504, server tự thử lại một lần sau 1 giây rồi thử model dự phòng GEMINI_FALLBACK_MODEL (mặc định gemini-3.8-flash) (mặc định gemini-3.8-flash) thêm một lần. Lỗi khóa/quyền/model/hạn mức như 401/403/404/429 không bị lặp vô ích. Mỗi lượt gọi có timeout 20 giây. Cấu hình hai biến sau trong môi trường chạy server hoặc file `.env` riêng trên máy chủ; không đưa khóa thật lên GitHub:
+Mặc định server dùng **OpenRouter Free Models Router** với model cố định \`openrouter/free\`.
+Server gọi API tương thích OpenAI tại \`https://openrouter.ai/api/v1/chat/completions\`; không cần SDK bổ sung.
+OpenRouter tự chọn model miễn phí phù hợp với loại đầu vào, bao gồm văn bản hoặc ảnh. Mỗi phản hồi có trường
+\`model\` cho biết model miễn phí thực tế đã xử lý yêu cầu; thông tin này xuất hiện trong dashboard quản trị.
 
-```env
-GEMINI_API_KEY=KHOA_GOOGLE_AI_STUDIO_CUA_BAN
-GEMINI_MODEL=gemini-3.5-flash-lite
-GEMINI_FALLBACK_MODEL=gemini-3.8-flash
-```
+Cấu hình hai biến trong môi trường chạy server hoặc file \`.env\` riêng trên máy chủ:
 
-Nếu không có `GEMINI_API_KEY`, các bộ quy tắc cục bộ vẫn hoạt động, nhưng các yêu cầu phân tích Gemini trả về lỗi cấu hình rõ ràng.
+\`\`\`env
+AI_PROVIDER=openrouter
+OPENROUTER_API_KEY=KHOA_OPENROUTER_CUA_BAN
+\`\`\`
+
+**Giới hạn của gói miễn phí:** OpenRouter hiện công bố mức mặc định 20 yêu cầu/phút và 50 yêu cầu/ngày cho free variants
+(không mua credit); yêu cầu thất bại cũng có thể tính vào hạn mức ngày. Hạn mức có thể thay đổi theo tài khoản.
+Khi gặp HTTP 429/503, ScamShield ghi rõ lý do rồi dùng bộ quy tắc cục bộ. Server không lặp gọi nhiều lần và không tự chuyển
+sang model trả phí. OpenRouter tự thực hiện định tuyến nhà cung cấp ở phía họ.
+
+\`GEMINI_API_KEY\`, \`GEMINI_MODEL\` và \`GEMINI_FALLBACK_MODEL\` vẫn được giữ cho trường hợp quản trị viên chủ động
+chọn \`AI_PROVIDER=gemini\`. Chúng **không được gọi tự động** khi \`AI_PROVIDER=openrouter\`, kể cả khi thiếu OpenRouter Key.
 
 ### API phân tích ngữ cảnh hội thoại
 
-`POST /api/monitor/conversation` yêu cầu đăng nhập và nhận tối đa 12 tin nhắn thuộc **một cuộc trò chuyện đã chọn**:
+\`POST /api/monitor/conversation\` yêu cầu đăng nhập và nhận tối đa 12 tin nhắn thuộc **một cuộc trò chuyện đã chọn**.
+Giao thức Android không thay đổi:
 
-```json
+\`\`\`json
 {
   "messages": [
     {"sender": "Người gửi", "text": "Nội dung tin nhắn", "timestamp": 1794900000000}
   ]
 }
-```
+\`\`\`
 
-Máy chủ gửi nội dung này trực tiếp tới Gemini để trả về `risk_score`, `risk_level`, `summary`, `evidence`, `recommended_action`, `confidence` và `conversation_memory`. App có thể gửi kèm trường `memory` là bản tóm tắt ngữ cảnh có cấu trúc của chính thread đó. Bộ nhớ được lưu cục bộ trên thiết bị và gửi lại ở lần phân tích sau; server chỉ xử lý trong yêu cầu hiện tại, không lưu transcript hoặc bộ nhớ vào cơ sở dữ liệu/log. Bộ nhớ gồm tóm tắt, sự kiện, hành vi quan sát được và điểm còn cần xác minh; server giới hạn kích thước và số mục. Endpoint giới hạn 12 yêu cầu/phút/tài khoản, giới hạn transcript 6.000 ký tự. App chỉ gọi endpoint sau khi người dùng đồng ý bật phân tích tự động trong Theo dõi chat, hoặc chủ động bấm phân tích. Xóa đối tượng theo dõi cũng xóa bộ nhớ liên quan trên thiết bị.
+Máy chủ trả về \`risk_score\`, \`risk_level\`, \`summary\`, \`evidence\`, \`recommended_action\`, \`confidence\` và
+\`conversation_memory\`. App lưu bộ nhớ thread ở thiết bị và gửi lại ở lần phân tích sau; server không lưu transcript
+hoặc bộ nhớ hội thoại. Endpoint giới hạn 12 yêu cầu/phút/tài khoản và transcript tối đa 6.000 ký tự.
+App chỉ gọi endpoint sau khi người dùng đồng ý bật phân tích tự động hoặc chủ động bấm phân tích.
 
-Endpoint `/api/chat` và giao diện chatbot thông thường vẫn giữ giao thức cũ, độc lập với endpoint theo dõi chat.
+Các endpoint \`/api/chat\`, \`/api/analyze/text\`, \`/api/analyze/media\` và \`/api/monitor/conversation\` giữ nguyên
+request/response Android hiện tại. Chỉ nhà cung cấp AI phía server thay đổi. Nếu dịch vụ miễn phí không khả dụng,
+bộ quy tắc cục bộ vẫn có thể tạo kết quả dự phòng. Kết quả AI là chỉ báo rủi ro, không phải kết luận chắc chắn.
 
-Lưu ý: Android chỉ cung cấp cho app nội dung mà ứng dụng nhắn tin hiển thị trong thông báo. Không thể đảm bảo thu được toàn bộ lịch sử hoặc cả hai chiều tin nhắn. Kết quả Gemini là chỉ báo rủi ro, không phải kết luận chắc chắn.
 
 ## 3b. Tra cứu tài khoản ngân hàng (VietQR)
 
@@ -99,12 +114,12 @@ VietQR có thể giới hạn hỗ trợ theo ngân hàng và gói dịch vụ.
 
 Lịch sử chi tiết dashboard AI lưu tối đa 500 sự kiện trong 30 ngày. Mỗi bản ghi chỉ có loại tính năng,
 trạng thái, thời gian, thời lượng, bản xem trước yêu cầu đã che số điện thoại, email, dãy số dài,
-trường OTP/mật khẩu và tham số truy vấn URL, cùng lý do lỗi Gemini. Với Theo dõi chat, chỉ lưu số lượng/
+trường OTP/mật khẩu và tham số truy vấn URL, cùng nhà cung cấp/model thực tế và lý do lỗi. Với Theo dõi chat, chỉ lưu số lượng/
 kích thước tin nhắn; không lưu transcript. Ảnh không được lưu. Quản trị viên có thể xóa lịch sử trong dashboard.
 
 
 Mở `/admin` từ chính máy chạy server và đăng nhập bằng `ADMIN_KEY`.
-Mục **AI & Hệ thống** hiển thị cấu hình Gemini, model, thời điểm gọi gần nhất,
+Mục **AI & Hệ thống** hiển thị nhà cung cấp AI (mặc định OpenRouter Free), model, thời điểm gọi gần nhất,
 lượt thành công/thất bại riêng cho **Theo dõi chat** và **Chatbot thông thường**,
 thời điểm server khởi động và tình trạng file TFLite. Thời gian hiển thị theo múi giờ Việt Nam.
 Số liệu lời gọi AI chỉ được giữ trong bộ nhớ của tiến trình server và đặt lại khi khởi động lại;
