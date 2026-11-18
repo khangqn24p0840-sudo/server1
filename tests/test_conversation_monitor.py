@@ -421,6 +421,21 @@ class AiActivityHistoryTests(unittest.TestCase):
         self.assertIn("GEMINI_API_KEY", row[2])
 
 
+    def test_activity_history_persists_provider_and_resolved_model(self):
+        server._GEMINI_LOCAL.provider_used = "openrouter"
+        server._GEMINI_LOCAL.model_used = "nvidia/example-free-model"
+        server.record_ai_status(
+            "chat", "success", server.time.perf_counter() - 0.01,
+            "Kiểm tra nội dung mẫu",
+        )
+        with server.sqlite3.connect(server.DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT provider, model FROM ai_activity ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+        self.assertEqual(row[0], "openrouter")
+        self.assertEqual(row[1], "nvidia/example-free-model")
+
+
     def test_activity_endpoint_requires_admin_key(self):
         response = self.client.get("/admin/ai-activity")
         self.assertIn(response.status_code, (403, 404))
