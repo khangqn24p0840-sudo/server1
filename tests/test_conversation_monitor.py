@@ -229,6 +229,89 @@ class ConversationMonitorApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
 
 
+class AiActivityHistoryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        server.app.config.update(TESTING=True)
+        cls.client = server.app.test_client()
+
+    def setUp(self):
+        with server.sqlite3.connect(server.DB_PATH) as conn:
+            conn.execute("DELETE FROM ai_activity")
+
+    def test_preview_redacts_credentials_phone_email_and_url_parameters(self):
+        preview = server.sanitize_ai_preview(
+            "OTP: 123456, mật khẩu: MySecret, gọi 0912345678, mail a@b.com "
+            "và https://example.vn/check?token=private"
+        )
+        for secret in ("123456", "MySecret", "0912345678", "a@b.com", "token=private"):
+            self.assertNotIn(secret, preview)
+        self.assertIn("[đã ẩn]", preview)
+        self.assertIn("https://example.vn/check", preview)
+
+    def test_activity_endpoint_shows_sanitized_request_and_failure_reason(self):
+        server.record_ai_status(
+            "chat", "failure", server.time.perf_counter() - 0.02,
+            "Kiểm tra tin nhắn OTP: 123456 từ 0912345678",
+            "Gemini tạm thời quá tải (HTTP 503 / UNAVAILABLE). Thử lại sau.", 503,
+        )
+        with patch.object(server, "ADMIN_KEY", "test-admin-key"):
+            response = self.client.get(
+                "/admin/ai-activity?feature=chat",
+                headers={"X-Admin-Key": "test-admin-key"},
+            )
+        self.assertEqual(response.status_code, 200, response.get_json())
+        payload = response.get_json()
+        self.assertEqual(payload["total"], 1)
+        item = payload["items"][0]
+        self.assertEqual(item["feature_label"], "Chatbot thông thường")
+        self.assertEqual(item["status_label"], "Thất bại")
+        self.assertEqual(item["provider_code"], 503)
+        self.assertIn("503", item["failure_reason"])
+        self.assertNotIn("123456", item["request_preview"])
+        self.assertNotIn("0912345678", item["request_preview"])
+
+    def test_monitor_without_gemini_key_is_recorded_with_reason(self):
+        email = f"activity-{uuid.uuid4().hex[:8]}@example.test"
+        registered = self.client.post(
+            "/api/register",
+            json={"email": email, "password": "test-password-123", "username": "Activity"},
+        )
+        self.assertEqual(registered.status_code, 200, registered.get_json())
+        headers = {"Authorization": "Bearer " + registered.get_json()["token"]}
+        with patch.object(server, "GEMINI_API_KEY", ""):
+            response = self.client.post(
+                "/api/monitor/conversation",
+                json={"messages": [{"sender": "Người gửi", "text": "Nội dung thử", "timestamp": 1000}]},
+                headers=headers,
+            )
+        self.assertEqual(response.status_code, 503)
+        with server.sqlite3.connect(server.DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT status, request_preview, failure_reason FROM ai_activity "
+                "WHERE feature='monitor' ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+        self.assertEqual(row[0], "failure")
+        self.assertIn("Gemini chưa được cấu hình", row[1])
+        self.assertIn("API Key", row[2])
+
+
+    def test_activity_endpoint_requires_admin_key(self):
+        response = self.client.get("/admin/ai-activity")
+        self.assertIn(response.status_code, (403, 404))
+
+    def test_clear_activity_endpoint_deletes_rows(self):
+        server.record_ai_status("monitor", "failure", request_preview="Phân tích hội thoại (2 tin nhắn).",
+                                failure_reason="Gemini HTTP 503", provider_code=503)
+        with patch.object(server, "ADMIN_KEY", "test-admin-key"):
+            response = self.client.delete(
+                "/admin/ai-activity",
+                headers={"X-Admin-Key": "test-admin-key"},
+            )
+        self.assertEqual(response.status_code, 200, response.get_json())
+        self.assertEqual(response.get_json()["deleted"], 1)
+
+
 class AdminAiStatusTests(unittest.TestCase):
     def test_ai_status_includes_server_clock_and_monitor_usage(self):
         server.app.config.update(TESTING=True)

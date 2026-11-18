@@ -45,26 +45,73 @@ import jwt
 from flask import Flask, g, jsonify, request, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
 
-# Thống kê chẩn đoán AI trong bộ nhớ tiến trình (không lưu nội dung hội thoại).
+# Thống kê AI trong bộ nhớ tiến trình và nhật ký hoạt động đã lọc dữ liệu nhạy cảm.
 SERVER_STARTED_AT = int(time.time())
 _AI_STATUS_LOCK = threading.Lock()
+_GEMINI_LOCAL = threading.local()
 _AI_STATUS = {
-    "monitor": {"requests": 0, "success": 0, "failures": 0, "last_at": None, "last_result": "Chưa có lượt phân tích", "last_ms": None},
-    "chat": {"requests": 0, "success": 0, "failures": 0, "last_at": None, "last_result": "Chưa có lượt chat", "last_ms": None},
+    "monitor": {"requests": 0, "success": 0, "failures": 0, "last_at": None, "last_result": "Chưa có lượt phân tích", "last_ms": None, "last_failure_reason": None},
+    "chat": {"requests": 0, "success": 0, "failures": 0, "last_at": None, "last_result": "Chưa có lượt chat", "last_ms": None, "last_failure_reason": None},
 }
 
-def record_ai_status(feature, outcome, started=None):
+def set_gemini_failure(reason, code=None):
+    _GEMINI_LOCAL.failure_reason = str(reason or "Gemini không trả kết quả hợp lệ.")[:240]
+    _GEMINI_LOCAL.provider_code = int(code) if code is not None else None
+
+def gemini_failure_reason():
+    return getattr(_GEMINI_LOCAL, "failure_reason", None)
+
+def gemini_failure_code():
+    return getattr(_GEMINI_LOCAL, "provider_code", None)
+
+def sanitize_ai_preview(value):
+    """Short admin QA preview with common personal data and secrets masked."""
+    text = re.sub(r"[\x00-\x1f\x7f]", " ", str(value or ""))
+    text = re.sub(
+        r"(?i)\b(otp|mã\s*otp|mã\s*xác\s*thực|mật\s*khẩu|password|passcode)\s*[:=]\s*[^\s,;]+",
+        r"\1: [đã ẩn]",
+        text,
+    )
+    text = re.sub(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", "[email đã ẩn]", text)
+    text = re.sub(r"(?<!\w)(?:\+?84|0)(?:[\s.-]?\d){8,10}(?!\w)", "[số điện thoại đã ẩn]", text)
+    text = re.sub(r"(?<!\d)\d(?:[\s.-]?\d){7,}(?!\d)", "[dãy số đã ẩn]", text)
+    text = re.sub(r"(https?://[^\s?#]+)(?:\?[^\s#]*)?", r"\1?[tham số đã ẩn]", text, flags=re.I)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:240] + ("…" if len(text) > 240 else "")
+
+def record_ai_status(feature, outcome, started=None, request_preview="", failure_reason=None, provider_code=None):
     if feature not in _AI_STATUS:
         return
     now = int(time.time())
     elapsed = round((time.perf_counter() - started) * 1000) if started is not None else None
+    success = outcome == "success"
+    if not success and not failure_reason:
+        failure_reason = gemini_failure_reason() or "Gemini không trả về kết quả AI hợp lệ."
+    if success:
+        failure_reason = None
+        provider_code = None
+    safe_preview = sanitize_ai_preview(request_preview)
     with _AI_STATUS_LOCK:
         item = _AI_STATUS[feature]
         item["requests"] += 1
-        item["success" if outcome == "success" else "failures"] += 1
+        item["success" if success else "failures"] += 1
         item["last_at"] = now
-        item["last_result"] = "Thành công" if outcome == "success" else "Thất bại"
+        item["last_result"] = "Thành công" if success else "Thất bại"
         item["last_ms"] = elapsed
+        item["last_failure_reason"] = failure_reason
+    # Store a short, masked preview only. Never persist transcripts, image bytes, user IDs or emails.
+    try:
+        with sqlite3.connect(DB_PATH, timeout=5) as conn:
+            conn.execute(
+                "INSERT INTO ai_activity(feature,status,ts,duration_ms,request_preview,failure_reason,provider_code) "
+                "VALUES(?,?,?,?,?,?,?)",
+                (feature, "success" if success else "failure", now, elapsed, safe_preview,
+                 str(failure_reason)[:240] if failure_reason else None, provider_code),
+            )
+            conn.execute("DELETE FROM ai_activity WHERE ts < ?", (now - 30 * 86400,))
+            conn.execute("DELETE FROM ai_activity WHERE id NOT IN (SELECT id FROM ai_activity ORDER BY id DESC LIMIT 500)")
+    except sqlite3.Error as exc:
+        app.logger.warning("Không lưu được lịch sử hoạt động AI: %s", type(exc).__name__)
 
 # ----------------------------------------------------------------- cấu hình
 DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
@@ -213,6 +260,16 @@ def init_db():
           published INTEGER NOT NULL, fetched INTEGER NOT NULL, hidden INTEGER NOT NULL DEFAULT 0);
         CREATE INDEX IF NOT EXISTS idx_news_pub ON news(published DESC);
         CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
+        CREATE TABLE IF NOT EXISTS ai_activity(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          feature TEXT NOT NULL,
+          status TEXT NOT NULL,
+          ts INTEGER NOT NULL,
+          duration_ms INTEGER,
+          request_preview TEXT NOT NULL DEFAULT '',
+          failure_reason TEXT,
+          provider_code INTEGER);
+        CREATE INDEX IF NOT EXISTS idx_ai_activity_ts ON ai_activity(ts DESC);
         CREATE TABLE IF NOT EXISTS family_chats(
           id INTEGER PRIMARY KEY,
           name TEXT NOT NULL,
@@ -451,6 +508,44 @@ def admin_ai_status():
                   if MODEL_VERSION_PATH.is_file() else None},
         metrics_scope="Từ lúc tiến trình server khởi động; không lưu nội dung hội thoại."
     )
+
+
+@app.get("/admin/ai-activity")
+@admin
+def admin_ai_activity():
+    feature = str(request.args.get("feature", "all")).strip().lower()
+    if feature not in ("all", "chat", "monitor"):
+        raise ApiError("Bộ lọc hoạt động AI không hợp lệ.")
+    try:
+        limit = max(1, min(200, int(request.args.get("limit", "100"))))
+    except ValueError:
+        limit = 100
+    d = db()
+    where = "WHERE feature=?" if feature != "all" else ""
+    args = (feature,) if feature != "all" else ()
+    total = d.execute("SELECT COUNT(*) FROM ai_activity " + where, args).fetchone()[0]
+    rows = d.execute(
+        "SELECT id,feature,status,ts,duration_ms,request_preview,failure_reason,provider_code "
+        "FROM ai_activity " + where + " ORDER BY id DESC LIMIT ?",
+        args + (limit,),
+    ).fetchall()
+    items = []
+    for row in rows:
+        item = dict(row)
+        item["feature_label"] = "Theo dõi chat" if item["feature"] == "monitor" else "Chatbot thông thường"
+        item["status_label"] = "Thành công" if item["status"] == "success" else "Thất bại"
+        items.append(item)
+    return jsonify(items=items, total=total, shown=len(items), retention_days=30, max_records=500)
+
+
+@app.delete("/admin/ai-activity")
+@admin
+def admin_clear_ai_activity():
+    d = db()
+    count = d.execute("SELECT COUNT(*) FROM ai_activity").fetchone()[0]
+    d.execute("DELETE FROM ai_activity")
+    d.commit()
+    return jsonify(ok=True, deleted=count)
 
 
 @app.get("/api/model/manifest")
@@ -1670,14 +1765,16 @@ def admin_dashboard():
 
 # ----------------------------------------------------------------- AI: Google Gemini (tùy chọn)
 def gemini(system, content, max_tokens=700):
-    """Gọi Gemini REST API; trả None khi chưa cấu hình hoặc nhà cung cấp gặp lỗi."""
+    """Call Gemini and keep a safe, request-local diagnostic for the admin activity log."""
+    set_gemini_failure(None, None)
     if not GEMINI_API_KEY:
+        set_gemini_failure("Chưa cấu hình Gemini API Key.")
         return None
     if not re.fullmatch(r"[A-Za-z0-9._-]+", GEMINI_MODEL):
         app.logger.error("GEMINI_MODEL không hợp lệ")
+        set_gemini_failure("Tên model Gemini không hợp lệ.")
         return None
 
-    # Hỗ trợ cả văn bản và ảnh (inlineData) để giữ nguyên luồng phân tích ảnh hiện có.
     if isinstance(content, list):
         parts = []
         for item in content:
@@ -1693,6 +1790,7 @@ def gemini(system, content, max_tokens=700):
             elif item.get("type") == "text" and item.get("text"):
                 parts.append({"text": str(item["text"])[:MAX_TEXT]})
         if not parts:
+            set_gemini_failure("Yêu cầu gửi Gemini không có nội dung hợp lệ.")
             return None
     else:
         parts = [{"text": str(content)[:MAX_TEXT * 3]}]
@@ -1715,26 +1813,49 @@ def gemini(system, content, max_tokens=700):
         candidates = result.get("candidates") or []
         if not candidates:
             app.logger.warning("Gemini không trả về candidate (có thể bị chặn bởi safety settings)")
+            set_gemini_failure("Gemini không trả kết quả; có thể phản hồi đã bị bộ lọc an toàn chặn.")
             return None
         response_parts = (candidates[0].get("content") or {}).get("parts") or []
         answer = "".join(str(part.get("text", "")) for part in response_parts if part.get("text"))
-        return answer.strip() or None
+        if not answer.strip():
+            set_gemini_failure("Gemini trả về phản hồi rỗng.")
+            return None
+        return answer.strip()
     except urllib.error.HTTPError as exc:
-        # Không ghi URL/request headers vì URL có chứa API key.
         try:
             detail = exc.read(1200).decode("utf-8", errors="replace")
         except Exception:
             detail = ""
+        reasons = {
+            400: "Gemini từ chối yêu cầu (HTTP 400). Kiểm tra định dạng nội dung gửi lên.",
+            401: "Gemini từ chối API Key (HTTP 401). Kiểm tra lại khóa API.",
+            403: "Gemini không cấp quyền truy cập (HTTP 403). Kiểm tra quyền API hoặc model.",
+            404: "Không tìm thấy model Gemini (HTTP 404). Kiểm tra tên model đang cấu hình.",
+            429: "Gemini đang giới hạn số lượt gọi (HTTP 429). Chờ hạn mức được làm mới rồi thử lại.",
+            500: "Gemini gặp sự cố nội bộ (HTTP 500). Thử lại sau.",
+            502: "Cổng dịch vụ Gemini gặp lỗi (HTTP 502). Thử lại sau.",
+            503: "Gemini tạm thời quá tải (HTTP 503 / UNAVAILABLE). Đây là lỗi phía nhà cung cấp; thử lại sau.",
+            504: "Gemini phản hồi quá thời gian (HTTP 504). Thử lại sau."
+        }
+        reason = reasons.get(exc.code, f"Gemini trả lỗi HTTP {exc.code}.")
+        set_gemini_failure(reason, exc.code)
         app.logger.warning("Gemini HTTP %s: %s", exc.code, detail[:500])
         return None
-    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+    except (urllib.error.URLError, TimeoutError) as exc:
+        set_gemini_failure("Không kết nối được Gemini: lỗi mạng hoặc hết thời gian chờ.")
         app.logger.warning("Không kết nối được Gemini: %s", type(exc).__name__)
+        return None
+    except (ValueError, json.JSONDecodeError):
+        set_gemini_failure("Gemini trả dữ liệu không đọc được.")
+        app.logger.warning("Gemini trả dữ liệu không đọc được")
         return None
 
 
 def text_ai(system, content, max_tokens=700):
     """Text analysis uses Gemini only; without a key the caller falls back to local rules."""
+    set_gemini_failure(None, None)
     if not GEMINI_API_KEY:
+        set_gemini_failure("Chưa cấu hình Gemini API Key.")
         return None
     return gemini(system, content, max_tokens=max_tokens)
 
@@ -1891,6 +2012,11 @@ def monitor_conversation_api():
     """Analyze one selected tracked conversation with Gemini; transcript is not stored server-side."""
     rate_limit(("monitor_conversation", g.user["id"]), 12, per=60)
     if not GEMINI_API_KEY:
+        record_ai_status(
+            "monitor", "failure", time.perf_counter(),
+            "Phân tích cuộc trò chuyện (Gemini chưa được cấu hình).",
+            "Chưa cấu hình Gemini API Key trên máy chủ.",
+        )
         raise ApiError("Gemini chưa được cấu hình trên máy chủ.", 503)
 
     request_data = body()
@@ -1960,10 +2086,12 @@ def monitor_conversation_api():
     ai_started = time.perf_counter()
     raw = gemini(system, prompt, max_tokens=1400)
     normalized = normalize_conversation_analysis(raw)
+    request_preview = f"Phân tích cuộc trò chuyện ({len(lines)} tin nhắn, {total_chars} ký tự). Nội dung transcript không được lưu."
     if normalized is None:
-        record_ai_status("monitor", "failure", ai_started)
+        reason = gemini_failure_reason() or "Gemini trả nội dung không đúng cấu trúc phân tích yêu cầu."
+        record_ai_status("monitor", "failure", ai_started, request_preview, reason, gemini_failure_code())
         raise ApiError("Gemini chưa trả về kết quả phân tích hợp lệ. Hãy thử lại sau.", 502)
-    record_ai_status("monitor", "success", ai_started)
+    record_ai_status("monitor", "success", ai_started, request_preview)
     return jsonify(**normalized, ai=True, message_count=len(lines), last_message_timestamp=last_message_timestamp)
 
 
@@ -1992,7 +2120,12 @@ def chat_api():
     ai_started = time.perf_counter()
     answer = text_ai(CHAT_SYSTEM, prompt, max_tokens=1100)
     ai_answered = bool(answer)
-    record_ai_status("chat", "success" if ai_answered else "failure", ai_started)
+    record_ai_status(
+        "chat", "success" if ai_answered else "failure", ai_started,
+        sanitize_ai_preview(message),
+        None if ai_answered else (gemini_failure_reason() or "Gemini không trả lời được yêu cầu."),
+        gemini_failure_code(),
+    )
     mode, risk = "assistant", None
     if not answer:
         low = message.lower()
@@ -2024,9 +2157,19 @@ def analyze_text():
 
     h_risk, h_reasons = heuristic_text(text)
     ai_started = time.perf_counter()
-    ai = parse_json(text_ai(TEXT_SYSTEM, f"<noi_dung>\n{text}\n</noi_dung>"))
+    raw_ai = text_ai(TEXT_SYSTEM, f"<noi_dung>\n{text}\n</noi_dung>")
+    ai = parse_json(raw_ai)
     ai_ok = isinstance(ai, dict) and isinstance(ai.get("risk"), (int, float))
-    record_ai_status("chat", "success" if ai_ok else "failure", ai_started)
+    failure_reason = None
+    if not ai_ok:
+        failure_reason = gemini_failure_reason() or (
+            "Gemini trả nội dung không đúng định dạng JSON phân tích." if raw_ai
+            else "Gemini không trả kết quả; hệ thống dùng bộ quy tắc dự phòng."
+        )
+    record_ai_status(
+        "chat", "success" if ai_ok else "failure", ai_started,
+        sanitize_ai_preview(text), failure_reason, gemini_failure_code(),
+    )
 
     ai_advice = ""
     if isinstance(ai, dict) and isinstance(ai.get("risk"), (int, float)):
@@ -2205,11 +2348,22 @@ def analyze_media():
         notes.append("Ảnh không có thông tin chụp (EXIF), có thể đã bị xử lý hoặc gửi qua mạng xã hội")
 
     ai_started = time.perf_counter()
-    ai = parse_json(gemini(MEDIA_SYSTEM, [
+    raw_ai = gemini(MEDIA_SYSTEM, [
         {"type": "image", "source": {"type": "base64", "media_type": mime, "data": base64.b64encode(img).decode()}},
-        {"type": "text", "text": "Đánh giá ảnh này."}], max_tokens=300))
+        {"type": "text", "text": "Đánh giá ảnh này."}], max_tokens=300)
+    ai = parse_json(raw_ai)
     ai_ok = isinstance(ai, dict) and isinstance(ai.get("fake_probability"), (int, float))
-    record_ai_status("chat", "success" if ai_ok else "failure", ai_started)
+    failure_reason = None
+    if not ai_ok:
+        failure_reason = gemini_failure_reason() or (
+            "Gemini trả nội dung ảnh không đúng định dạng kết quả." if raw_ai
+            else "Gemini không phân tích được ảnh; chỉ sử dụng dấu hiệu kỹ thuật cục bộ."
+        )
+    record_ai_status(
+        "chat", "success" if ai_ok else "failure", ai_started,
+        f"Kiểm tra ảnh ({mime}, {len(img)} byte). Không lưu tệp ảnh.",
+        failure_reason, gemini_failure_code(),
+    )
     if ai_ok:
         p = max(0.0, min(1.0, float(ai["fake_probability"])))
         score = max(score, 0.6 * p + 0.4 * score) if score else p
