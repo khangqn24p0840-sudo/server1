@@ -182,6 +182,39 @@ class ConversationMonitorApiTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 400)
 
+    def test_android_chatbot_text_analysis_updates_admin_chat_metrics(self):
+        headers = self.register()
+        raw = json.dumps({
+            "risk": 72,
+            "reasons": ["Yêu cầu chuyển khoản"],
+            "advice": "Không chuyển tiền; hãy xác minh qua kênh chính thức.",
+        }, ensure_ascii=False)
+        with patch.object(server, "text_ai", return_value=raw), \
+             patch.object(server, "record_ai_status") as record:
+            response = self.client.post(
+                "/api/analyze/text",
+                json={"text": "Tin nhắn yêu cầu chuyển khoản để xác minh tài khoản."},
+                headers=headers,
+            )
+        self.assertEqual(response.status_code, 200, response.get_json())
+        record.assert_called_once()
+        self.assertEqual(record.call_args.args[0], "chat")
+        self.assertEqual(record.call_args.args[1], "success")
+
+    def test_android_chatbot_gemini_503_fallback_updates_failure_metric(self):
+        headers = self.register()
+        with patch.object(server, "text_ai", return_value=None), \
+             patch.object(server, "record_ai_status") as record:
+            response = self.client.post(
+                "/api/analyze/text",
+                json={"text": "Tin nhắn yêu cầu chuyển khoản để xác minh tài khoản."},
+                headers=headers,
+            )
+        self.assertEqual(response.status_code, 200, response.get_json())
+        record.assert_called_once()
+        self.assertEqual(record.call_args.args[0], "chat")
+        self.assertEqual(record.call_args.args[1], "failure")
+
     def test_endpoint_rejects_oversized_transcript(self):
         headers = self.register()
         with patch.object(server, "GEMINI_API_KEY", "test-gemini-key"):
