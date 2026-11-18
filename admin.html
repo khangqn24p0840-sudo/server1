@@ -47,6 +47,85 @@ code{background:var(--bg);padding:6px 10px;border-radius:6px;display:block;margi
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
 .li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd);font-size:14px}
 .li:last-child{border-bottom:0}
+
+/* Cyber AI dashboard shell */
+#app:not(.hide){display:flex;min-height:100vh;background:#080d24}
+.sidebar{width:226px;flex:0 0 226px;min-height:100vh;position:sticky;top:0;align-self:flex-start;height:100vh;overflow-y:auto;padding:20px 15px 16px;background:linear-gradient(180deg,#191c49 0%,#101735 72%,#0d132c 100%);border-right:1px solid #2a3566;display:flex;flex-direction:column;z-index:5}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 7px 28px}
+.brand-shield{width:34px;height:34px;border-radius:11px;background:linear-gradient(145deg,#5ed1f2,#576cff);display:grid;place-items:center;color:#fff;font-size:23px;box-shadow:0 0 22px #3e75ff66}
+.brand strong{display:block;font-size:17px;letter-spacing:.2px}.brand small{display:block;color:#8290c2;font-size:9px;letter-spacing:1.3px;margin-top:1px}
+.nav-caption{font-size:10px;color:#7f8ab8;letter-spacing:1.3px;padding:8px 9px;margin-top:7px}
+.side-nav{display:grid;gap:5px}
+.sidebar .tab{border:1px solid transparent;background:transparent;color:#aeb9dc;width:100%;display:flex;align-items:center;gap:11px;text-align:left;padding:10px 11px;border-radius:8px;font-size:13px;white-space:nowrap}
+.sidebar .tab:hover{background:#252c5b;border-color:#333f78}
+.sidebar .tab.on{background:linear-gradient(90deg,#213b72,#28305f);border-color:#3c5594;color:#5ce0f0;box-shadow:inset 3px 0 #39cde8}
+.nav-icon{width:20px;text-align:center;font-size:17px;color:#a6b7ee}
+.sidebar .tab.on .nav-icon{color:#54d9ee}
+.nav-arrow{margin-left:auto;font-size:20px}
+.sidebar-bottom{margin-top:auto;padding:18px 10px 5px;text-align:center;color:#aebbe8;display:flex;flex-direction:column;align-items:center}
+.shield-art{width:120px;height:92px;position:relative;margin-bottom:8px;display:grid;place-items:center;overflow:hidden}
+.shield-art:before{content:"";position:absolute;width:76px;height:76px;border:2px solid #4054a5;border-radius:35% 35% 48% 48%;transform:rotate(45deg);box-shadow:0 0 35px #3978ff55,inset 0 0 24px #4366ba44}
+.shield-art span{font-size:47px;color:#4f7fc7;text-shadow:0 0 20px #4a93ff;z-index:1}
+.shield-art i,.shield-art b{position:absolute;width:100px;height:1px;background:#4d5ca4;bottom:8px;box-shadow:0 0 15px #56baff}
+.sidebar-bottom strong{font-size:13px}.sidebar-bottom small{font-size:11px;color:#7786b5;margin-top:2px}
+.sidebar-online{font-size:9px;letter-spacing:1px;color:#6fdbbd;margin-top:17px}.sidebar-online i,.admin-chip i,.live-label i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#35d6a0;margin-right:6px;box-shadow:0 0 10px #35d6a0}
+.workspace{min-width:0;flex:1;background:radial-gradient(ellipse at 80% 0%,#18154a 0%,#0b1028 48%,#090e22 100%)}
+.topbar{min-height:76px;position:sticky;top:0;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 28px;background:rgba(18,23,57,.94);border-bottom:1px solid #2a3566;backdrop-filter:blur(14px)}
+.topbar-title h1{font-size:19px;margin:2px 0 0}.topbar-kicker{font-size:9px;letter-spacing:1.7px;color:#7788c0}
+.head-actions{gap:15px}.admin-chip{font-size:12px;color:#aebce2;padding:7px 11px;border-radius:30px;background:#202852;border:1px solid #344078}
+#clock-display{font-size:12px;color:#9eacd5;font-variant-numeric:tabular-nums}
+.workspace main{max-width:none;width:100%;padding:24px 28px 40px;margin:0}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px}
+.section-head h2{font-size:18px;margin:0}.section-head p{font-size:12px;color:#8795bf;margin:3px 0 0}
+.section-actions{display:flex;align-items:center;gap:9px}.section-actions select{width:auto;min-width:105px}
+.dashboard-grid{display:grid;grid-template-columns:minmax(220px, .34fr) minmax(0,1fr);gap:16px;align-items:start}
+.metric-column,.main-column{min-width:0}.metric-column>.stats{display:grid;grid-template-columns:1fr;gap:12px;margin:0 0 14px}
+#stats .card{margin:0;min-height:91px;padding:15px 16px;display:flex;align-items:center;gap:13px;background:linear-gradient(135deg,#202c66,#1c2351 55%,#22285b);border-color:#33417c;box-shadow:0 10px 28px #03081c66}
+.stat-icon{width:39px;height:39px;flex:0 0 39px;border-radius:50%;display:grid;place-items:center;background:#253d75;color:#69dafa;font-size:21px;box-shadow:inset 0 0 0 1px #527ac5,0 0 18px #386ecb44}
+.stat-copy b{display:block;font-size:23px;line-height:1.25;color:#f4f6ff}.stat-copy span{font-size:11px;color:#9eadd5}
+.security-card{margin:0;text-align:left;background:linear-gradient(150deg,#1d2452,#151b3e);border-color:#344075}
+.security-head{display:flex;align-items:center;gap:9px}.security-head b{display:block;font-size:11px;letter-spacing:1px}.security-head small{display:block;font-size:10px;color:#8291bd}
+.security-orb{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:#6ae2e8;background:#294b78;font-size:19px}
+.live-dot{margin-left:auto;width:8px;height:8px;background:#35d6a0;border-radius:50%;box-shadow:0 0 12px #35d6a0}
+.security-gauge{height:92px;display:grid;place-items:center;margin:14px 0 4px}
+.gauge-ring{width:116px;height:58px;border:10px solid #263b67;border-bottom:0;border-radius:100px 100px 0 0;position:relative;display:grid;place-items:center;overflow:hidden}
+.gauge-ring:before{content:"";position:absolute;inset:-10px -10px -2px;border:10px solid transparent;border-top-color:#51d6bb;border-left-color:#56cfc8;border-right-color:#b4d6ed;border-radius:100px 100px 0 0;transform:rotate(-8deg)}
+.gauge-ring span{font-size:17px;font-weight:700;color:#c8e9ff;align-self:end;margin-bottom:-1px;z-index:1}
+.security-card p{font-size:11px;line-height:1.5;color:#a4b2d8;margin:7px 0 10px}
+.service-pills{display:flex;gap:5px;flex-wrap:wrap}.service-pill{font-size:9px;letter-spacing:.5px;padding:4px 6px;border-radius:5px;background:#202d56;color:#9db0dc}.service-pill.good{color:#5fe1bd;background:#123d49}.service-pill.warn{color:#ffd07f;background:#473a2c}
+.card{background:linear-gradient(145deg,#1a214c,#141a3b);border:1px solid #2c376c;border-radius:12px;box-shadow:0 12px 34px #02061755}
+.chart-card{padding:17px 18px 12px;margin:0 0 14px;min-height:326px}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:5px}
+.panel-head h3{font-size:14px;margin:0;color:#e8edff}.panel-head p{font-size:10px;margin:2px 0 0;color:#8796c4}
+.live-label{font-size:9px;letter-spacing:.8px;color:#9bb5db;white-space:nowrap}.live-label i{width:6px;height:6px}
+#chart{width:100%;min-height:240px}#chart svg{display:block;max-height:270px;overflow:visible}
+.legend{display:flex;gap:13px;flex-wrap:wrap;font-size:10px;color:#9eadd4;margin-top:3px}
+.dot{width:8px;height:8px}
+.kpi-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;margin:0 0 14px}
+#kpi .card{margin:0;padding:12px 11px;background:linear-gradient(135deg,#1e2857,#171e41);border-color:#2c3b70}
+#kpi .stat b{font-size:21px}#kpi .stat span{font-size:10px}#kpi .mu{font-size:10px!important}
+.network-card{padding:15px 17px;margin:0 0 14px}
+.service-network{display:flex;align-items:center;justify-content:space-around;gap:8px;padding:18px 8px 7px}
+.network-node{min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px}
+.network-node>span{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#203565;border:1px solid #4260a2;color:#75dcf4;font-size:20px;box-shadow:0 0 20px #3478c044}
+.network-node>span.node-warn{color:#ffc878;border-color:#92683d;background:#3b2d37}
+.network-node b{font-size:11px}.network-node small{font-size:9px;color:#8a9ac5;max-width:160px}
+.network-link{height:1px;flex:1;max-width:70px;background:linear-gradient(90deg,#4d6abb,#37c8bb);box-shadow:0 0 8px #43b9c7}
+.dashboard-details{margin-top:3px}.dashboard-details .card{min-width:0}
+.dashboard-updated{font-size:11px;margin:5px 2px 0}
+#t-users,#t-block,#t-posts,#t-comments,#t-news,#t-survey,#t-ai{max-width:1400px;margin:0 auto}
+#t-users.card,#t-block.card,#t-posts.card,#t-comments.card,#t-news.card,#t-survey.card{padding:20px}
+#t-ai>.row{padding:15px 17px;background:#1a214b;border:1px solid #303d75;border-radius:12px}
+input,textarea,select{background:#101735;color:#eaf0ff;border-color:#344174}
+button{background:#202951;color:#eaf0ff;border-color:#344174}
+button.p{background:linear-gradient(100deg,#4054ce,#4d83ed);border-color:#5776ec}
+.tab{font-family:inherit}
+table{font-size:13px}th,td{border-color:#2b3767}th{color:#9baad2}td{color:#dbe3fa}
+#modal .box{background:#182047;border:1px solid #39477d}
+#toast{background:#dce8ff;color:#101735;z-index:20}
+@media(max-width:1120px){.sidebar{width:200px;flex-basis:200px}.workspace main{padding:20px}.topbar{padding:12px 20px}.dashboard-grid{grid-template-columns:minmax(190px,.36fr) minmax(0,1fr)}.kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:820px){.sidebar{width:76px;flex-basis:76px;padding:16px 9px}.brand{justify-content:center;padding:2px 0 22px}.brand>div:last-child,.nav-caption,.sidebar .tab>span:not(.nav-icon),.sidebar-bottom{display:none}.sidebar .tab{justify-content:center;padding:12px 5px}.nav-icon{font-size:20px}.dashboard-grid{grid-template-columns:1fr}.metric-column>.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.security-card{display:none}}
+@media(max-width:600px){#app:not(.hide){display:block}.sidebar{width:100%;height:auto;min-height:0;position:relative;padding:10px 12px}.brand{justify-content:flex-start;padding:3px 4px 9px}.brand>div:last-child{display:block}.side-nav{display:flex;overflow-x:auto;padding-bottom:5px}.nav-caption{display:none}.sidebar .tab{width:auto;flex:0 0 auto;justify-content:flex-start;padding:8px 10px}.sidebar .tab>span:not(.nav-icon){display:inline}.sidebar .tab>span:nth-child(2){font-size:11px}.workspace main{padding:15px 12px}.topbar{position:relative;align-items:flex-start;flex-direction:column;padding:13px 15px}.head-actions{width:100%;justify-content:space-between;gap:8px;flex-wrap:wrap}#clock-display{font-size:10px}.section-head{align-items:flex-start;flex-direction:column}.section-actions{width:100%}.section-actions select{flex:1}.metric-column>.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.service-network{gap:4px;padding:14px 0}.network-node b{font-size:9px}.network-node small{font-size:8px}.network-link{max-width:26px}}
 </style>
 </head>
 <body>
@@ -59,49 +138,97 @@ code{background:var(--bg);padding:6px 10px;border-radius:6px;display:block;margi
 </div>
 
 <div id="app" class="hide">
-  <header><h1>🛡️ ScamShield – Quản trị</h1><div class="head-actions"><span id="clock-display" aria-live="off">Đang tải ngày giờ…</span><button id="out">Thoát</button></div></header>
-  <main>
-    <div class="stats" id="stats"></div>
-    <div class="tabs">
-      <button class="tab on" data-t="dash">Tổng quan</button>
-      <button class="tab" data-t="users">Tài khoản</button>
-      <button class="tab" data-t="block">Số lừa đảo</button>
-      <button class="tab" data-t="posts">Bài đăng</button>
-      <button class="tab" data-t="comments">Bình luận</button>
-      <button class="tab" data-t="news">Tin báo chí</button>
-      <button class="tab" data-t="survey">Khảo sát</button>
-      <button class="tab" data-t="ai">AI & Hệ thống</button>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-shield">⬡</div>
+      <div><strong>ScamShield</strong><small>SECURITY CONSOLE</small></div>
     </div>
-
-    <section id="t-dash">
-      <div class="row"><b>Tổng quan hoạt động</b><span style="flex:1"></span>
-        <select id="dd" style="width:auto"><option value="7">7 ngày</option><option value="14" selected>14 ngày</option><option value="30">30 ngày</option></select>
-        <button id="dr">Làm mới</button></div>
-      <div class="stats" id="kpi"></div>
-      <div class="card"><h3>Hoạt động theo ngày</h3><div id="chart"></div><div class="legend" id="legend"></div></div>
-      <div class="grid2">
+    <div class="nav-caption">MENU</div>
+    <nav class="side-nav" aria-label="Điều hướng quản trị">
+      <button class="tab on" data-t="dash"><span class="nav-icon">⌂</span><span>Dashboard</span></button>
+      <button class="tab" data-t="ai"><span class="nav-icon">◈</span><span>AI & Hệ thống</span><span class="nav-arrow">›</span></button>
+    </nav>
+    <div class="nav-caption">QUẢN LÝ</div>
+    <nav class="side-nav" aria-label="Quản lý dữ liệu">
+      <button class="tab" data-t="users"><span class="nav-icon">♙</span><span>Tài khoản</span></button>
+      <button class="tab" data-t="block"><span class="nav-icon">⊘</span><span>Số lừa đảo</span></button>
+      <button class="tab" data-t="posts"><span class="nav-icon">▤</span><span>Bài đăng</span></button>
+      <button class="tab" data-t="comments"><span class="nav-icon">▧</span><span>Bình luận</span></button>
+    </nav>
+    <div class="nav-caption">HỆ THỐNG</div>
+    <nav class="side-nav" aria-label="Hệ thống">
+      <button class="tab" data-t="news"><span class="nav-icon">◫</span><span>Tin báo chí</span></button>
+      <button class="tab" data-t="survey"><span class="nav-icon">☷</span><span>Khảo sát</span></button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="shield-art"><span>⬡</span><i></i><b></b></div>
+      <strong>ScamShield AI</strong>
+      <small>Giám sát an toàn số</small>
+      <div class="sidebar-online"><i></i> ADMIN CONSOLE</div>
+    </div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar">
+      <div class="topbar-title"><span class="topbar-kicker">SCAMSHIELD / ADMINISTRATION</span><h1 id="page-title">Dashboard</h1></div>
+      <div class="head-actions"><span class="admin-chip"><i></i> Quản trị viên</span><span id="clock-display" aria-live="off">Đang tải ngày giờ…</span><button id="out">Thoát</button></div>
+    </header>
+    <main>
+      <section id="t-dash">
+        <div class="section-head">
+          <div><h2>Tổng quan hoạt động</h2><p>Trạng thái và số liệu được lấy trực tiếp từ máy chủ ScamShield.</p></div>
+          <div class="section-actions"><select id="dd"><option value="7">7 ngày</option><option value="14" selected>14 ngày</option><option value="30">30 ngày</option></select><button id="dr" class="p">↻ Làm mới</button></div>
+        </div>
+        <div class="dashboard-grid">
+          <div class="metric-column">
+            <div class="stats" id="stats"></div>
+            <div class="card security-card">
+              <div class="security-head"><span class="security-orb">✦</span><div><b>AI SECURITY</b><small>Giám sát dịch vụ</small></div><span class="live-dot"></span></div>
+              <div class="security-gauge"><div class="gauge-ring"><span>AI</span></div></div>
+              <p id="dash-ai-summary">Đang kiểm tra trạng thái các dịch vụ…</p>
+              <div class="service-pills" id="dash-ai-pills"></div>
+            </div>
+          </div>
+          <div class="main-column">
+            <div class="card chart-card">
+              <div class="panel-head"><div><h3>Live Statistics</h3><p>Hoạt động theo ngày</p></div><span class="live-label"><i></i> DỮ LIỆU SERVER</span></div>
+              <div id="chart"></div><div class="legend" id="legend"></div>
+            </div>
+            <div class="kpi-grid" id="kpi"></div>
+            <div class="card network-card">
+              <div class="panel-head"><div><h3>Service Monitor</h3><p>Các thành phần đang được theo dõi</p></div><span class="live-label"><i></i> LIVE STATUS</span></div>
+              <div class="service-network" id="dash-system">
+                <div class="network-node"><span>◉</span><b>Server API</b><small>Đang kiểm tra</small></div>
+                <div class="network-link"></div>
+                <div class="network-node"><span>✦</span><b>Gemini AI</b><small>Đang kiểm tra</small></div>
+                <div class="network-link"></div>
+                <div class="network-node"><span>▦</span><b>ML TFLite</b><small>Đang kiểm tra</small></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="grid2 dashboard-details">
         <div class="card"><h3>Cảnh báo cộng đồng theo chủ đề</h3><div id="bytopic"></div></div>
         <div class="card"><h3>Cảnh báo từ máy người dùng (ẩn danh)</h3><div id="byevent"></div></div>
         <div class="card"><h3>Cần xử lý</h3><div id="modq"></div></div>
         <div class="card"><h3>Đóng góp nhiều nhất</h3><div id="top"></div></div>
         <div class="card"><h3>Đăng ký gần đây</h3><div id="recent"></div></div>
-      </div>
-      <p class="mu" id="dupd"></p>
-    </section>
+        </div>
+        <p class="mu dashboard-updated" id="dupd"></p>
+      </section>
 
-    <section id="t-users" class="card hide">
+      <section id="t-users" class="card hide"><div class="section-head"><div><h2>Tài khoản</h2><p>Quản lý và hỗ trợ tài khoản ScamShield.</p></div></div>
       <div class="row"><input id="q" placeholder="Tìm theo email…"><button id="rf">Tải lại</button></div>
       <div class="tw"><table><thead><tr><th>ID</th><th>Email</th><th>Ngày tạo</th><th>Thống kê</th><th>Trạng thái</th><th></th></tr></thead><tbody id="ub"></tbody></table></div>
       <p class="mu" id="ucount"></p>
     </section>
 
-    <section id="t-block" class="card hide">
+    <section id="t-block" class="card hide"><div class="section-head"><div><h2>Số lừa đảo</h2><p>Danh sách số điện thoại do cộng đồng và quản trị viên cung cấp.</p></div></div>
       <textarea id="nums" placeholder="Dán số điện thoại, mỗi số một dòng (0901234567, +84 28 3822 1234…)"></textarea>
       <div class="row" style="margin-top:8px"><input id="src" placeholder="Nguồn (tùy chọn)" value="admin"><button class="p" id="addn">Thêm số</button></div>
       <div class="tw"><table><thead><tr><th>Số</th><th>Nguồn</th><th>Ngày thêm</th><th></th></tr></thead><tbody id="bb"></tbody></table></div>
     </section>
 
-    <section id="t-posts" class="card hide">
+    <section id="t-posts" class="card hide"><div class="section-head"><div><h2>Bài đăng cộng đồng</h2><p>Quản lý và đăng cảnh báo chính thức.</p></div></div>
       <h3 style="margin:0 0 8px">Đăng cảnh báo chính thức</h3>
       <p class="mu">Hiện nhãn "CHÍNH THỨC", tác giả là ScamShield. Dùng để mở đầu bảng tin bằng thông tin thật đã kiểm chứng.</p>
       <input id="ot" placeholder="Tiêu đề (3–120 ký tự)" maxlength="120">
@@ -116,12 +243,12 @@ code{background:var(--bg);padding:6px 10px;border-radius:6px;display:block;margi
       <div class="tw"><table><thead><tr><th>Thời gian</th><th>Người đăng</th><th>Bài</th><th>👍</th><th>💬</th><th>🚩</th><th>Trạng thái</th><th></th></tr></thead><tbody id="pb"></tbody></table></div>
     </section>
 
-    <section id="t-comments" class="card hide">
+    <section id="t-comments" class="card hide"><div class="section-head"><div><h2>Bình luận</h2><p>Kiểm tra nội dung và xử lý báo cáo.</p></div></div>
       <p class="mu">Bình luận bị báo cáo từ 3 người trở lên sẽ tự ẩn và nằm đầu danh sách.</p>
       <div class="tw"><table><thead><tr><th>Thời gian</th><th>Người bình luận</th><th>Bình luận</th><th>Thuộc bài</th><th>🚩</th><th>Trạng thái</th><th></th></tr></thead><tbody id="cb"></tbody></table></div>
     </section>
 
-    <section id="t-news" class="card hide">
+    <section id="t-news" class="card hide"><div class="section-head"><div><h2>Tin báo chí</h2><p>Theo dõi nguồn RSS và tin liên quan cảnh báo lừa đảo.</p></div></div>
       <p class="mu">App chỉ hiện <b>tiêu đề, tóm tắt ngắn, tên báo</b> và nút "Đọc bài gốc" (mở trang của báo). Chỉ lấy bài có từ khóa liên quan lừa đảo.
         Hãy đọc điều khoản dùng RSS của từng báo và tắt nguồn nếu báo không cho phép.</p>
       <div class="row"><input id="nsn" placeholder="Tên báo (vd: Dân trí – Pháp luật)"><input id="nsu" placeholder="Địa chỉ RSS (https://…)"><button class="p" id="nsa">Thêm nguồn</button></div>
@@ -143,11 +270,12 @@ code{background:var(--bg);padding:6px 10px;border-radius:6px;display:block;margi
       <p class="mu">Số liệu yêu cầu được đếm từ lúc server khởi động lại gần nhất. Server không lưu nội dung tin nhắn, transcript, API key hoặc bộ nhớ hội thoại trong bảng giám sát này. "Đã cấu hình" không đồng nghĩa lần gọi gần nhất thành công.</p>
     </section>
 
-    <section id="t-survey" class="card hide">
+    <section id="t-survey" class="card hide"><div class="section-head"><div><h2>Khảo sát</h2><p>Phản hồi khảo sát ẩn danh từ người dùng.</p></div></div>
       <p class="mu">Khảo sát ẩn danh (không kèm email).</p>
       <div class="tw"><table><thead><tr><th>Thời gian</th><th>Câu trả lời</th></tr></thead><tbody id="sb"></tbody></table></div>
-    </section>
-  </main>
+      </section>
+    </main>
+  </div>
 </div>
 
 <div id="modal"><div class="box"><div id="mbody"></div><div class="row" style="justify-content:flex-end;margin:0" id="mbtn"></div></div></div>
@@ -201,14 +329,15 @@ async function enter() {
   try { await loadStats(); } catch (e) { $("#lerr").textContent = e.message; sessionStorage.removeItem("ak"); return; }
   $("#login").classList.add("hide"); $("#app").classList.remove("hide");
   loadDash();
+  loadAiStatus();
 }
 
 async function loadStats() {
   const s = await api("GET", "/admin/stats");
   const box = $("#stats"); box.replaceChildren();
-  [["Tài khoản", s.users], ["Số lừa đảo", s.blocklist], ["Khảo sát", s.surveys],
-   ["Sự kiện thống kê", s.events.reduce((a, e) => a + e.count, 0)]]
-    .forEach(([l, v]) => box.append(el("div", {className: "card stat"}, el("b", {textContent: v}), el("span", {textContent: l}))));
+  [["♙","Tài khoản", s.users], ["⛨","Số lừa đảo", s.blocklist], ["☷","Khảo sát", s.surveys],
+   ["◉","Sự kiện thống kê", s.events.reduce((a, e) => a + e.count, 0)]]
+    .forEach(([icon,l,v]) => box.append(el("div", {className: "card stat"}, el("span", {className:"stat-icon",textContent:icon}), el("div",{className:"stat-copy"},el("b", {textContent: Number(v).toLocaleString("vi-VN")}), el("span", {textContent: l})))));
 }
 
 async function loadUsers() {
@@ -319,20 +448,28 @@ const svgEl = (tag, attrs = {}, text) => {
 
 function lineChart(box, labels, series) {
   box.replaceChildren();
-  const W = 640, H = 220, L = 34, R = 10, T = 12, B = 26, n = labels.length;
-  const max = Math.max(1, ...series.flatMap(s => s.values)), top = max <= 5 ? 5 : Math.ceil(max / 5) * 5;
-  const X = i => L + (W - L - R) * (n === 1 ? 0.5 : i / (n - 1)), Y = v => T + (H - T - B) * (1 - v / top);
-  const svg = svgEl("svg", {viewBox: `0 0 ${W} ${H}`, width: "100%", role: "img", "aria-label": "Biểu đồ hoạt động theo ngày"});
-  for (let i = 0; i <= 4; i++) {
-    const y = T + (H - T - B) * i / 4;
-    svg.append(svgEl("line", {x1: L, x2: W - R, y1: y, y2: y, stroke: "currentColor", "stroke-opacity": "0.12"}),
-      svgEl("text", {x: L - 6, y: y + 4, "text-anchor": "end", "font-size": "10", fill: "currentColor", "fill-opacity": "0.6"}, String(Math.round(top * (4 - i) / 4))));
+  const W=760,H=270,L=42,R=12,T=18,B=38,n=labels.length;
+  const max=Math.max(1,...series.flatMap(s=>s.values));
+  const top=Math.max(5,Math.ceil(max/5)*5);
+  const groupW=(W-L-R)/Math.max(1,n), barGap=3;
+  const barW=Math.max(3,Math.min(12,(groupW-10)/series.length-barGap));
+  const actualGroup=series.length*(barW+barGap)-barGap;
+  const X=i=>L+groupW*i+(groupW-actualGroup)/2;
+  const Y=v=>T+(H-T-B)*(1-v/top);
+  const svg=svgEl("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",role:"img","aria-label":"Biểu đồ cột hoạt động theo ngày"});
+  for(let i=0;i<=4;i++){
+    const y=T+(H-T-B)*i/4;
+    svg.append(svgEl("line",{x1:L,x2:W-R,y1:y,y2:y,stroke:"#7280b7","stroke-opacity":"0.22"}));
+    svg.append(svgEl("text",{x:L-8,y:y+4,"text-anchor":"end","font-size":"11",fill:"#98a7d8"},String(Math.round(top*(4-i)/4))));
   }
-  const step = Math.ceil(n / 8);
-  labels.forEach((l, i) => { if (i % step === 0 || i === n - 1) svg.append(svgEl("text", {x: X(i), y: H - 8, "text-anchor": "middle", "font-size": "10", fill: "currentColor", "fill-opacity": "0.6"}, l.slice(8) + "/" + l.slice(5, 7))); });
-  series.forEach(s => {
-    svg.append(svgEl("polyline", {points: s.values.map((v, i) => X(i) + "," + Y(v)).join(" "), fill: "none", stroke: s.color, "stroke-width": "2.2", "stroke-linejoin": "round"}));
-    s.values.forEach((v, i) => { const c = svgEl("circle", {cx: X(i), cy: Y(v), r: 3, fill: s.color}); c.append(svgEl("title", {}, labels[i] + " • " + s.name + ": " + v)); svg.append(c); });
+  labels.forEach((label,i)=>{
+    if(i%Math.ceil(n/7)===0||i===n-1) svg.append(svgEl("text",{x:L+groupW*i+groupW/2,y:H-12,"text-anchor":"middle","font-size":"10",fill:"#a5b1d3"},label.slice(8)+"/"+label.slice(5,7)));
+    series.forEach((s,j)=>{
+      const v=Number(s.values[i]||0),x=X(i)+j*(barW+barGap),y=Y(v),height=Math.max(1,H-B-y);
+      const rect=svgEl("rect",{x,y,width:barW,height,rx:Math.min(4,barW/2),fill:s.color,"fill-opacity":j===0?"0.88":"0.72"});
+      rect.append(svgEl("title",{},label+" • "+s.name+": "+v));
+      svg.append(rect);
+    });
   });
   box.append(svg);
 }
@@ -442,6 +579,8 @@ $("#addn").onclick = async () => {
 
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === b));
+  const titles = {dash:"Dashboard", users:"Tài khoản", block:"Số lừa đảo", posts:"Bài đăng", comments:"Bình luận", news:"Tin báo chí", survey:"Khảo sát", ai:"AI & Hệ thống"};
+  $("#page-title").textContent = titles[b.dataset.t] || "Dashboard";
   ["dash", "users", "block", "posts", "comments", "news", "survey", "ai"].forEach(t => $("#t-" + t).classList.toggle("hide", t !== b.dataset.t));
   ({dash: loadDash, users: loadUsers, block: loadBlock, posts: loadPosts, comments: loadComments, news: loadNews, survey: loadSurveys, ai: loadAiStatus})[b.dataset.t]();
 });
@@ -483,11 +622,28 @@ async function loadAiStatus() {
     sys.append(statusLine("TFLite",d.ml_model.available ? "Có sẵn" : "Thiếu file",d.ml_model.available));
     sys.append(statusLine("Dung lượng model",d.ml_model.available ? (Math.round(d.ml_model.bytes/1024)+" KB") : "—",d.ml_model.available));
     sys.append(statusLine("Phiên bản model",d.ml_model.version || "Chưa đặt",d.ml_model.available));
+    const summary = $("#dash-ai-summary");
+    if (summary) summary.textContent = d.gemini.configured ? "Gemini đã được cấu hình. Tình trạng phân tích thực tế được thống kê riêng bên dưới." : "Gemini chưa được cấu hình; hệ thống chưa thể gọi AI từ máy chủ.";
+    const pills = $("#dash-ai-pills");
+    if (pills) {
+      pills.replaceChildren();
+      [["SERVER",d.server.ok],["GEMINI",d.gemini.configured],["MONITOR",d.monitor_chat.last_result === "Thành công"]]
+        .forEach(([label,ok]) => pills.append(el("span",{className:"service-pill "+(ok?"good":"warn"),textContent:label+" "+(ok?"ONLINE":"CHECK")})));
+    }
+    const network = $("#dash-system");
+    if (network) {
+      const nodes = [["Server API",d.server.ok,fmt(d.server.time)],["Gemini AI",d.gemini.configured,d.gemini.last_call_at?fmt(d.gemini.last_call_at):"Chưa có lượt gọi"],["ML TFLite",d.ml_model.available,d.ml_model.version || "Chưa phát hành"]];
+      network.replaceChildren();
+      nodes.forEach(([label,ok,detail],i) => {
+        if(i) network.append(el("div",{className:"network-link"}));
+        network.append(el("div",{className:"network-node"},el("span",{textContent:i===0?"◉":i===1?"✦":"▦",className:ok?"node-good":"node-warn"}),el("b",{textContent:label}),el("small",{textContent:detail})));
+      });
+    }
     $("#ai-updated").textContent = "Cập nhật " + new Date().toLocaleString("vi-VN", VN_TIME);
   } catch(e) { toast("Không tải được trạng thái AI: " + e.message); }
 }
 $("#ai-refresh").onclick = loadAiStatus;
-setInterval(() => { if (KEY && !document.hidden && !$("#t-ai").classList.contains("hide")) loadAiStatus(); }, 10000);
+setInterval(() => { if (KEY && !document.hidden && (!$("#t-ai").classList.contains("hide") || !$("#t-dash").classList.contains("hide"))) loadAiStatus(); }, 10000);
 
 let qt; $("#q").oninput = () => { clearTimeout(qt); qt = setTimeout(loadUsers, 300); };
 $("#rf").onclick = () => { loadUsers(); loadStats(); };
