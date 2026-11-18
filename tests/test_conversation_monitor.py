@@ -1,4 +1,5 @@
 import json
+import io
 import os
 import tempfile
 import unittest
@@ -15,6 +16,50 @@ os.environ.setdefault("NEWS_ENABLED", "false")
 os.environ.setdefault("ALLOW_REGISTRATION", "true")
 
 import server
+
+
+class GeminiRetryTests(unittest.TestCase):
+    def test_retries_primary_then_uses_flash_lite_fallback(self):
+        failure1 = server.urllib.error.HTTPError(
+            "https://example.invalid", 503, "Unavailable", {}, io.BytesIO(b'{"error":"busy"}')
+        )
+        failure2 = server.urllib.error.HTTPError(
+            "https://example.invalid", 503, "Unavailable", {}, io.BytesIO(b'{"error":"busy"}')
+        )
+        success = io.BytesIO(json.dumps({
+            "candidates": [{"content": {"parts": [{"text": "ok from fallback"}]}}]
+        }).encode("utf-8"))
+        with patch.multiple(
+            server,
+            GEMINI_API_KEY="test-key",
+            GEMINI_MODEL="gemini-primary-test",
+            GEMINI_FALLBACK_MODEL="gemini-fallback-test",
+        ), patch.object(server.urllib.request, "urlopen", side_effect=[failure1, failure2, success]) as call, patch.object(server.time, "sleep"):
+            result = server.gemini("system", "prompt")
+        self.assertEqual(result, "ok from fallback")
+        self.assertEqual(call.call_count, 3)
+        urls = [item.args[0].full_url for item in call.call_args_list]
+        self.assertIn("/gemini-primary-test:generateContent", urls[0])
+        self.assertIn("/gemini-primary-test:generateContent", urls[1])
+        self.assertIn("/gemini-fallback-test:generateContent", urls[2])
+        self.assertIsNone(server.gemini_failure_reason())
+        self.assertEqual(server._GEMINI_LOCAL.model_used, "gemini-fallback-test")
+
+    def test_does_not_retry_invalid_api_key(self):
+        failure = server.urllib.error.HTTPError(
+            "https://example.invalid", 401, "Unauthorized", {}, io.BytesIO(b'{"error":"bad key"}')
+        )
+        with patch.multiple(
+            server,
+            GEMINI_API_KEY="test-key",
+            GEMINI_MODEL="gemini-primary-test",
+            GEMINI_FALLBACK_MODEL="gemini-fallback-test",
+        ), patch.object(server.urllib.request, "urlopen", side_effect=failure) as call, patch.object(server.time, "sleep"):
+            result = server.gemini("system", "prompt")
+        self.assertIsNone(result)
+        self.assertEqual(call.call_count, 1)
+        self.assertEqual(server.gemini_failure_code(), 401)
+        self.assertIn("API Key", server.gemini_failure_reason())
 
 
 class ConversationMonitorNormalizationTests(unittest.TestCase):
