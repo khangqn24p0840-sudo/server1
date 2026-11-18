@@ -86,7 +86,7 @@ def record_ai_status(feature, outcome, started=None, request_preview="", failure
     elapsed = round((time.perf_counter() - started) * 1000) if started is not None else None
     success = outcome == "success"
     if not success and not failure_reason:
-        failure_reason = gemini_failure_reason() or "Gemini không trả về kết quả AI hợp lệ."
+        failure_reason = gemini_failure_reason() or "Nhà cung cấp AI không trả về kết quả hợp lệ."
     if success:
         failure_reason = None
         provider_code = None
@@ -102,11 +102,13 @@ def record_ai_status(feature, outcome, started=None, request_preview="", failure
     # Store a short, masked preview only. Never persist transcripts, image bytes, user IDs or emails.
     try:
         with sqlite3.connect(DB_PATH, timeout=5) as conn:
+            provider = ai_provider_used()
+            model = ai_model_used()
             conn.execute(
-                "INSERT INTO ai_activity(feature,status,ts,duration_ms,request_preview,failure_reason,provider_code) "
-                "VALUES(?,?,?,?,?,?,?)",
+                "INSERT INTO ai_activity(feature,status,ts,duration_ms,request_preview,failure_reason,provider_code,provider,model) "
+                "VALUES(?,?,?,?,?,?,?,?,?)",
                 (feature, "success" if success else "failure", now, elapsed, safe_preview,
-                 str(failure_reason)[:240] if failure_reason else None, provider_code),
+                 str(failure_reason)[:240] if failure_reason else None, provider_code, provider, model),
             )
             conn.execute("DELETE FROM ai_activity WHERE ts < ?", (now - 30 * 86400,))
             conn.execute("DELETE FROM ai_activity WHERE id NOT IN (SELECT id FROM ai_activity ORDER BY id DESC LIMIT 500)")
@@ -118,10 +120,13 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = os.environ.get("DB_PATH", str(DATA_DIR / "scamshield.db"))
 ADMIN_KEY = os.environ.get("ADMIN_KEY", "")               # để trống = tắt API quản trị
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()  # API key Google AI Studio; giữ bí mật
+AI_PROVIDER = os.environ.get("AI_PROVIDER", "openrouter").strip().lower()
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
+OPENROUTER_MODEL = "openrouter/free"  # Cố định router miễn phí; không tự chuyển sang model trả phí.
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()  # Chỉ dùng khi AI_PROVIDER=gemini.
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
 GEMINI_FALLBACK_MODEL = os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-3.8-flash").strip()
-# Text AI uses Google Gemini when GEMINI_API_KEY is configured; otherwise local rules remain available.
+# Mặc định OpenRouter free; Gemini chỉ dùng khi AI_PROVIDER=gemini được đặt tường minh.
 VIETQR_CLIENT_ID = os.environ.get("VIETQR_CLIENT_ID", "").strip()
 VIETQR_API_KEY = os.environ.get("VIETQR_API_KEY", "").strip()
 ALLOW_REGISTRATION = os.environ.get("ALLOW_REGISTRATION", "true").lower() == "true"
@@ -269,7 +274,9 @@ def init_db():
           duration_ms INTEGER,
           request_preview TEXT NOT NULL DEFAULT '',
           failure_reason TEXT,
-          provider_code INTEGER);
+          provider_code INTEGER,
+          provider TEXT,
+          model TEXT);
         CREATE INDEX IF NOT EXISTS idx_ai_activity_ts ON ai_activity(ts DESC);
         CREATE TABLE IF NOT EXISTS family_chats(
           id INTEGER PRIMARY KEY,
@@ -316,6 +323,11 @@ def init_db():
         c.execute("ALTER TABLE users ADD COLUMN sess INTEGER NOT NULL DEFAULT 0")
     if "name" not in cols:  # tên hiển thị công khai (Cộng đồng)
         c.execute("ALTER TABLE users ADD COLUMN name TEXT")
+    ai_cols = [r[1] for r in c.execute("PRAGMA table_info(ai_activity)")]
+    if "provider" not in ai_cols:
+        c.execute("ALTER TABLE ai_activity ADD COLUMN provider TEXT")
+    if "model" not in ai_cols:
+        c.execute("ALTER TABLE ai_activity ADD COLUMN model TEXT")
     pcols = [r[1] for r in c.execute("PRAGMA table_info(posts)")]
     for col, ddl in (("title", "TEXT"), ("topic", "TEXT"), ("severity", "TEXT"), ("official", "INTEGER NOT NULL DEFAULT 0")):
         if col not in pcols:
@@ -469,8 +481,34 @@ def normalize_number(raw):
 
 # ----------------------------------------------------------------- tài khoản
 def configured_ai_provider():
-    """This server build uses Gemini for text AI; no alternate provider is selected."""
-    return "gemini" if GEMINI_API_KEY else "rules"
+    """Select exactly one provider. OpenRouter free is default; no silent paid Gemini fallback."""
+    if AI_PROVIDER == "openrouter":
+        return "openrouter" if OPENROUTER_API_KEY else "rules"
+    if AI_PROVIDER == "gemini":
+        return "gemini" if GEMINI_API_KEY else "rules"
+    return "rules"
+
+
+def provider_is_configured():
+    return configured_ai_provider() in ("openrouter", "gemini")
+
+
+def configured_ai_model():
+    provider = configured_ai_provider()
+    if provider == "openrouter":
+        return OPENROUTER_MODEL
+    if provider == "gemini":
+        return GEMINI_MODEL
+    return None
+
+
+def ai_provider_used():
+    # The request-local value is authoritative for the model call that just completed.
+    return getattr(_GEMINI_LOCAL, "provider_used", None) or configured_ai_provider()
+
+
+def ai_model_used():
+    return getattr(_GEMINI_LOCAL, "model_used", None) or configured_ai_model()
 
 
 @app.get("/health")
@@ -478,10 +516,10 @@ def health():
     provider = configured_ai_provider()
     return jsonify(
         ok=True,
-        ai=provider == "gemini",
+        ai=provider in ("openrouter", "gemini"),
         ai_provider=provider,
-        ai_model=GEMINI_MODEL if provider == "gemini" else None,
-        media_ai=bool(GEMINI_API_KEY),
+        ai_model=configured_ai_model(),
+        media_ai=provider in ("openrouter", "gemini"),
     )
 
 
@@ -493,14 +531,19 @@ def admin_ai_status():
         usage = {name: dict(values) for name, values in _AI_STATUS.items()}
     candidates = [(name, values) for name, values in usage.items() if values["last_at"] is not None]
     latest = max(candidates, key=lambda pair: pair[1]["last_at"]) if candidates else (None, None)
+    provider_status = {
+        "configured": provider_is_configured(),
+        "provider": configured_ai_provider(),
+        "model": configured_ai_model(),
+        "last_call_at": latest[1]["last_at"] if latest[1] else None,
+        "last_call_from": ("Theo dõi chat" if latest[0] == "monitor" else "Chatbot thông thường") if latest[0] else None,
+        "last_call_result": latest[1]["last_result"] if latest[1] else "Chưa có lượt gọi",
+    }
     return jsonify(
         server={"ok": True, "time": int(time.time()), "started_at": SERVER_STARTED_AT},
-        gemini={"configured": bool(GEMINI_API_KEY), "provider": "gemini" if GEMINI_API_KEY else "rules",
-                "model": GEMINI_MODEL if GEMINI_API_KEY else None,
-                "last_call_at": latest[1]["last_at"] if latest[1] else None,
-                "last_call_from": ("Theo dõi chat" if latest[0] == "monitor" else "Chatbot thông thường") if latest[0] else None,
-                "last_call_result": latest[1]["last_result"] if latest[1] else "Chưa có lượt gọi"},
-        media_ai={"configured": bool(GEMINI_API_KEY)},
+        ai_service=provider_status,
+        gemini=provider_status,  # legacy alias for older admin pages
+        media_ai={"configured": provider_is_configured()},
         monitor_chat=usage["monitor"],
         normal_chat=usage["chat"],
         ml_model={"available": MODEL_PATH.is_file(),
@@ -526,7 +569,7 @@ def admin_ai_activity():
     args = (feature,) if feature != "all" else ()
     total = d.execute("SELECT COUNT(*) FROM ai_activity " + where, args).fetchone()[0]
     rows = d.execute(
-        "SELECT id,feature,status,ts,duration_ms,request_preview,failure_reason,provider_code "
+        "SELECT id,feature,status,ts,duration_ms,request_preview,failure_reason,provider_code,provider,model "
         "FROM ai_activity " + where + " ORDER BY id DESC LIMIT ?",
         args + (limit,),
     ).fetchall()
@@ -1764,10 +1807,127 @@ def admin_dashboard():
                    week={k: sum(series[k][-7:]) for k in ("users", "posts", "comments")})
 
 
+# ----------------------------------------------------------------- AI: OpenRouter Free Router
+def openrouter_generate(system, content, max_tokens=700):
+    """Call the fixed OpenRouter free router; no paid fallback or wasteful client-side retries."""
+    set_gemini_failure(None, None)
+    _GEMINI_LOCAL.provider_used = "openrouter"
+    _GEMINI_LOCAL.model_used = OPENROUTER_MODEL
+    if not OPENROUTER_API_KEY:
+        set_gemini_failure("Chưa cấu hình OPENROUTER_API_KEY trên máy chủ.")
+        return None
+
+    if isinstance(content, list):
+        user_content = []
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "text" and item.get("text"):
+                user_content.append({"type": "text", "text": str(item["text"])[:MAX_TEXT]})
+            elif item.get("type") == "image":
+                source = item.get("source") or {}
+                if source.get("type") == "base64" and source.get("data"):
+                    mime = str(source.get("media_type") or "image/jpeg")
+                    data = str(source["data"])
+                    user_content.append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{mime};base64,{data}"}
+                    })
+        if not user_content:
+            set_gemini_failure("Yêu cầu gửi OpenRouter không có nội dung hợp lệ.")
+            return None
+    else:
+        user_content = str(content)[:MAX_TEXT * 3]
+
+    payload = {
+        "model": OPENROUTER_MODEL,
+        "messages": [
+            {"role": "system", "content": str(system)[:12000]},
+            {"role": "user", "content": user_content},
+        ],
+        "max_tokens": max(128, min(int(max_tokens), 4096)),
+        "stream": False,
+    }
+    req = urllib.request.Request(
+        "https://openrouter.ai/api/v1/chat/completions",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + OPENROUTER_API_KEY,
+            "HTTP-Referer": "https://github.com/khangqn24p0840-sudo/ScamShield",
+            "X-Title": "ScamShield",
+        },
+        method="POST",
+    )
+    reasons = {
+        400: "OpenRouter không chấp nhận định dạng yêu cầu (HTTP 400).",
+        401: "OpenRouter từ chối API Key (HTTP 401). Kiểm tra OPENROUTER_API_KEY.",
+        402: "OpenRouter yêu cầu thanh toán hoặc không thể cung cấp tuyến miễn phí này (HTTP 402). ScamShield không tự chuyển sang model trả phí.",
+        403: "OpenRouter từ chối quyền truy cập (HTTP 403). Kiểm tra quyền API Key hoặc chính sách tài khoản.",
+        404: "Không tìm thấy tuyến openrouter/free (HTTP 404).",
+        408: "OpenRouter hết thời gian chờ (HTTP 408).",
+        413: "Yêu cầu vượt kích thước dữ liệu cho phép (HTTP 413).",
+        429: "OpenRouter đã giới hạn yêu cầu miễn phí (HTTP 429). Có thể đã chạm giới hạn lượt/phút hoặc lượt/ngày; chờ hạn mức được làm mới.",
+        500: "OpenRouter gặp lỗi nội bộ (HTTP 500).",
+        502: "Nhà cung cấp phía sau OpenRouter gặp lỗi (HTTP 502).",
+        503: "OpenRouter hiện không có model miễn phí phù hợp hoặc nhà cung cấp đang quá tải (HTTP 503).",
+        504: "OpenRouter phản hồi quá thời gian (HTTP 504).",
+    }
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            result = json.load(response)
+        choices = result.get("choices") or []
+        if not choices:
+            error = result.get("error") or {}
+            message = str(error.get("message") or "OpenRouter không trả về choices.")[:180]
+            code = error.get("code")
+            set_gemini_failure("OpenRouter không trả kết quả: " + message, code if isinstance(code, int) else None)
+            return None
+        response_message = choices[0].get("message") or {}
+        response_content = response_message.get("content")
+        if isinstance(response_content, list):
+            answer = "".join(
+                str(part.get("text", "")) for part in response_content
+                if isinstance(part, dict) and part.get("text")
+            )
+        else:
+            answer = str(response_content or "")
+        _GEMINI_LOCAL.model_used = str(result.get("model") or OPENROUTER_MODEL)[:160]
+        if not answer.strip():
+            set_gemini_failure("OpenRouter trả về phản hồi rỗng.")
+            return None
+        return answer.strip()
+    except urllib.error.HTTPError as exc:
+        try:
+            error_body = json.loads(exc.read(1600).decode("utf-8", errors="replace"))
+        except Exception:
+            error_body = {}
+        error = error_body.get("error") or {}
+        detail = str(error.get("message") or "")[:180]
+        if OPENROUTER_API_KEY:
+            detail = detail.replace(OPENROUTER_API_KEY, "[API Key đã ẩn]")
+        reason = reasons.get(exc.code, f"OpenRouter trả lỗi HTTP {exc.code}.")
+        if detail and exc.code not in (401, 402, 403):
+            reason += " Chi tiết: " + detail
+        set_gemini_failure(reason, exc.code)
+        app.logger.warning("OpenRouter HTTP %s: %s", exc.code, detail or "provider error")
+        return None
+    except (urllib.error.URLError, TimeoutError, socket.timeout):
+        set_gemini_failure("Không kết nối được OpenRouter: lỗi mạng hoặc hết thời gian chờ.")
+        app.logger.warning("Không kết nối được OpenRouter: network/timeout")
+        return None
+    except (ValueError, json.JSONDecodeError):
+        set_gemini_failure("OpenRouter trả dữ liệu không đọc được.")
+        app.logger.warning("OpenRouter trả dữ liệu không đọc được")
+        return None
+
+
 # ----------------------------------------------------------------- AI: Google Gemini (tùy chọn)
 def gemini(system, content, max_tokens=700):
-    """Call Gemini with bounded retry and a lighter model fallback for transient capacity failures."""
+    """Call Gemini only when AI_PROVIDER=gemini was selected explicitly."""
     set_gemini_failure(None, None)
+    _GEMINI_LOCAL.provider_used = "gemini"
+    _GEMINI_LOCAL.model_used = GEMINI_MODEL
     if not GEMINI_API_KEY:
         set_gemini_failure("Chưa cấu hình Gemini API Key.")
         return None
@@ -1889,13 +2049,28 @@ def gemini(system, content, max_tokens=700):
     return None
 
 
-def text_ai(system, content, max_tokens=700):
-    """Text analysis uses Gemini only; without a key the caller falls back to local rules."""
+def ai_generate(system, content, max_tokens=700):
+    """Route through the configured provider without changing Android API request/response contracts."""
     set_gemini_failure(None, None)
-    if not GEMINI_API_KEY:
-        set_gemini_failure("Chưa cấu hình Gemini API Key.")
-        return None
-    return gemini(system, content, max_tokens=max_tokens)
+    provider = configured_ai_provider()
+    _GEMINI_LOCAL.provider_used = provider
+    _GEMINI_LOCAL.model_used = configured_ai_model()
+    if provider == "openrouter":
+        return openrouter_generate(system, content, max_tokens=max_tokens)
+    if provider == "gemini":
+        return gemini(system, content, max_tokens=max_tokens)
+    if AI_PROVIDER == "openrouter":
+        set_gemini_failure("Chưa cấu hình OPENROUTER_API_KEY; hãy nhập khóa OpenRouter trên máy chủ.")
+    elif AI_PROVIDER == "gemini":
+        set_gemini_failure("Chưa cấu hình GEMINI_API_KEY trên máy chủ.")
+    else:
+        set_gemini_failure("AI_PROVIDER không hợp lệ; chọn openrouter hoặc gemini.")
+    return None
+
+
+def text_ai(system, content, max_tokens=700):
+    """Backwards-compatible helper; actual provider is selected by AI_PROVIDER."""
+    return ai_generate(system, content, max_tokens=max_tokens)
 
 
 def parse_json(txt):
@@ -2049,13 +2224,16 @@ def normalize_conversation_analysis(raw):
 def monitor_conversation_api():
     """Analyze one selected tracked conversation with Gemini; transcript is not stored server-side."""
     rate_limit(("monitor_conversation", g.user["id"]), 12, per=60)
-    if not GEMINI_API_KEY:
+    if not provider_is_configured():
+        _GEMINI_LOCAL.provider_used = AI_PROVIDER if AI_PROVIDER in ("openrouter", "gemini") else "rules"
+        _GEMINI_LOCAL.model_used = None
+        required_key = "OPENROUTER_API_KEY" if AI_PROVIDER == "openrouter" else "GEMINI_API_KEY"
         record_ai_status(
             "monitor", "failure", time.perf_counter(),
-            "Phân tích cuộc trò chuyện (Gemini chưa được cấu hình).",
-            "Chưa cấu hình Gemini API Key trên máy chủ.",
+            "Phân tích cuộc trò chuyện (chưa cấu hình nhà cung cấp AI).",
+            "Chưa cấu hình " + required_key + " trên máy chủ.",
         )
-        raise ApiError("Gemini chưa được cấu hình trên máy chủ.", 503)
+        raise ApiError("Chưa cấu hình nhà cung cấp AI trên máy chủ.", 503)
 
     request_data = body()
     incoming = request_data.get("messages")
@@ -2122,11 +2300,11 @@ def monitor_conversation_api():
         "\n</previous_memory>\n<new_messages>\n" + "\n".join(lines) + "\n</new_messages>"
     )
     ai_started = time.perf_counter()
-    raw = gemini(system, prompt, max_tokens=1400)
+    raw = ai_generate(system, prompt, max_tokens=1400)
     normalized = normalize_conversation_analysis(raw)
     request_preview = f"Phân tích cuộc trò chuyện ({len(lines)} tin nhắn, {total_chars} ký tự). Nội dung transcript không được lưu."
     if normalized is None:
-        reason = gemini_failure_reason() or "Gemini trả nội dung không đúng cấu trúc phân tích yêu cầu."
+        reason = gemini_failure_reason() or "Nhà cung cấp AI trả nội dung không đúng cấu trúc phân tích yêu cầu."
         record_ai_status("monitor", "failure", ai_started, request_preview, reason, gemini_failure_code())
         raise ApiError("Gemini chưa trả về kết quả phân tích hợp lệ. Hãy thử lại sau.", 502)
     record_ai_status("monitor", "success", ai_started, request_preview)
@@ -2201,8 +2379,8 @@ def analyze_text():
     failure_reason = None
     if not ai_ok:
         failure_reason = gemini_failure_reason() or (
-            "Gemini trả nội dung không đúng định dạng JSON phân tích." if raw_ai
-            else "Gemini không trả kết quả; hệ thống dùng bộ quy tắc dự phòng."
+            "Nhà cung cấp AI trả nội dung không đúng định dạng JSON phân tích." if raw_ai
+            else "Nhà cung cấp AI không trả kết quả; hệ thống dùng bộ quy tắc dự phòng."
         )
     record_ai_status(
         "chat", "success" if ai_ok else "failure", ai_started,
@@ -2386,7 +2564,7 @@ def analyze_media():
         notes.append("Ảnh không có thông tin chụp (EXIF), có thể đã bị xử lý hoặc gửi qua mạng xã hội")
 
     ai_started = time.perf_counter()
-    raw_ai = gemini(MEDIA_SYSTEM, [
+    raw_ai = ai_generate(MEDIA_SYSTEM, [
         {"type": "image", "source": {"type": "base64", "media_type": mime, "data": base64.b64encode(img).decode()}},
         {"type": "text", "text": "Đánh giá ảnh này."}], max_tokens=300)
     ai = parse_json(raw_ai)

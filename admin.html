@@ -135,7 +135,7 @@ table{font-size:13px}th,td{border-color:#2b3767}th{color:#9baad2}td{color:#dbe3f
 .activity-open-button{width:100%;margin-top:12px;color:#65d8e8;background:#202b5b;border-color:#3a4c8c;font-size:12px}
 .activity-open-button:hover{background:#26366f}
 .ai-history-card{padding:17px;margin-top:12px}
-.ai-history-table{min-width:980px}
+.ai-history-table{min-width:1140px}
 .ai-history-table td{vertical-align:top;white-space:normal;max-width:280px}
 .ai-preview-cell{min-width:230px;max-width:320px;line-height:1.5;color:#c6d5f4}
 .ai-failure-cell{min-width:260px;max-width:340px;color:#ff9aa9;line-height:1.5;white-space:normal}
@@ -215,7 +215,7 @@ table{font-size:13px}th,td{border-color:#2b3767}th{color:#9baad2}td{color:#dbe3f
               <div class="service-network" id="dash-system">
                 <div class="network-node"><span>◉</span><b>Server API</b><small>Đang kiểm tra</small></div>
                 <div class="network-link"></div>
-                <div class="network-node"><span>✦</span><b>Gemini AI</b><small>Đang kiểm tra</small></div>
+                <div class="network-node"><span>✦</span><b>OpenRouter AI</b><small>Đang kiểm tra</small></div>
                 <div class="network-link"></div>
                 <div class="network-node"><span>▦</span><b>ML TFLite</b><small>Đang kiểm tra</small></div>
               </div>
@@ -280,7 +280,7 @@ table{font-size:13px}th,td{border-color:#2b3767}th{color:#9baad2}td{color:#dbe3f
       <div class="row"><b>Giám sát AI & máy chủ</b><span style="flex:1"></span><span class="mu" id="ai-updated">Đang tải…</span><button id="ai-refresh">Làm mới</button></div>
       <div class="stats" id="ai-cards"></div>
       <div class="grid2">
-        <div class="card"><h3>Gemini – nhà cung cấp AI</h3><div id="ai-gemini"></div></div>
+        <div class="card"><h3>Nhà cung cấp AI – OpenRouter Free</h3><div id="ai-gemini"></div></div>
         <div class="card"><h3>Theo dõi chat – phân tích hội thoại</h3><div id="ai-monitor"></div></div>
         <div class="card"><h3>Chatbot thông thường</h3><div id="ai-chat"></div></div>
         <div class="card"><h3>Máy chủ & model ML</h3><div id="ai-system"></div></div>
@@ -306,7 +306,7 @@ table{font-size:13px}th,td{border-color:#2b3767}th{color:#9baad2}td{color:#dbe3f
         <div class="card ai-history-card">
           <div class="panel-head"><div><h3>Chi tiết các lượt yêu cầu</h3><p id="ai-activity-count">Đang tải…</p></div><span class="live-label"><i></i> ADMIN ONLY</span></div>
           <div class="tw"><table class="ai-history-table">
-            <thead><tr><th>Ngày giờ</th><th>Tính năng</th><th>Nội dung yêu cầu (đã che)</th><th>Kết quả</th><th>Thời gian</th><th>Lý do thất bại</th></tr></thead>
+            <thead><tr><th>Ngày giờ</th><th>Tính năng</th><th>Nội dung yêu cầu (đã che)</th><th>Nhà cung cấp / model</th><th>Kết quả</th><th>Thời gian</th><th>Lý do thất bại</th></tr></thead>
             <tbody id="ai-activity-body"><tr><td colspan="6" class="mu">Đang tải lịch sử…</td></tr></tbody>
           </table></div>
         </div>
@@ -647,18 +647,18 @@ async function loadAiStatus() {
   try {
     const d = await api("GET", "/admin/ai-status");
     const cards = $("#ai-cards"); cards.replaceChildren();
-    [["Gemini", d.gemini.configured ? "Đã cấu hình" : "Chưa cấu hình", d.gemini.configured, "all"],
+    [["OpenRouter", d.ai_service.configured ? "Đã cấu hình" : "Chưa cấu hình", d.ai_service.configured, "all"],
      ["Theo dõi chat", d.monitor_chat.requests + " yêu cầu", d.monitor_chat.last_result === "Thành công", "monitor"],
      ["Chatbot", d.normal_chat.requests + " yêu cầu", d.normal_chat.last_result === "Thành công", "chat"],
      ["Model ML", d.ml_model.available ? "Đã có file" : "Chưa có file", d.ml_model.available, "all"]]
       .forEach(([name,value,ok,feature]) => cards.append(el("button",{type:"button",className:"card stat ai-stat-card",title:"Mở dashboard chi tiết",onclick:()=>openAiDetail(feature)},el("b",{textContent:value}),el("span",{textContent:name}),el("small",{textContent:"Xem chi tiết →"}))));
     const g=$("#ai-gemini"); g.replaceChildren();
-    g.append(statusLine("Nhà cung cấp",d.gemini.provider.toUpperCase(),d.gemini.configured));
-    g.append(statusLine("Model",d.gemini.model || "Không dùng Gemini",d.gemini.configured));
+    g.append(statusLine("Nhà cung cấp",d.ai_service.provider.toUpperCase(),d.ai_service.configured));
+    g.append(statusLine("Model",d.ai_service.model || "Không dùng AI từ xa",d.ai_service.configured));
     g.append(statusLine("AI media",d.media_ai.configured ? "Đã bật theo cấu hình" : "Chưa bật",d.media_ai.configured));
-    g.append(statusLine("Gemini gọi gần nhất",fmt(d.gemini.last_call_at),!!d.gemini.last_call_at));
-    g.append(statusLine("Được gọi từ",d.gemini.last_call_from || "Chưa có",!!d.gemini.last_call_from));
-    g.append(statusLine("Kết quả Gemini gần nhất",d.gemini.last_call_result || "Chưa có",d.gemini.last_call_result === "Thành công"));
+    g.append(statusLine("AI gọi gần nhất",fmt(d.ai_service.last_call_at),!!d.ai_service.last_call_at));
+    g.append(statusLine("Được gọi từ",d.ai_service.last_call_from || "Chưa có",!!d.ai_service.last_call_from));
+    g.append(statusLine("Kết quả AI gần nhất",d.ai_service.last_call_result || "Chưa có",d.ai_service.last_call_result === "Thành công"));
     renderUsage($("#ai-monitor"),d.monitor_chat,"Chưa có lượt phân tích","monitor");
     renderUsage($("#ai-chat"),d.normal_chat,"Chưa có lượt chat","chat");
     const sys=$("#ai-system"); sys.replaceChildren();
@@ -669,16 +669,16 @@ async function loadAiStatus() {
     sys.append(statusLine("Dung lượng model",d.ml_model.available ? (Math.round(d.ml_model.bytes/1024)+" KB") : "—",d.ml_model.available));
     sys.append(statusLine("Phiên bản model",d.ml_model.version || "Chưa đặt",d.ml_model.available));
     const summary = $("#dash-ai-summary");
-    if (summary) summary.textContent = d.gemini.configured ? "Gemini đã được cấu hình. Tình trạng phân tích thực tế được thống kê riêng bên dưới." : "Gemini chưa được cấu hình; hệ thống chưa thể gọi AI từ máy chủ.";
+    if (summary) summary.textContent = d.ai_service.configured ? (d.ai_service.provider.toUpperCase() + " đã được cấu hình. Tình trạng phân tích thực tế được thống kê riêng bên dưới.") : "Chưa cấu hình API Key cho nhà cung cấp AI đã chọn; hệ thống đang dùng bộ quy tắc cục bộ.";
     const pills = $("#dash-ai-pills");
     if (pills) {
       pills.replaceChildren();
-      [["SERVER",d.server.ok],["GEMINI",d.gemini.configured],["MONITOR",d.monitor_chat.last_result === "Thành công"]]
+      [["SERVER",d.server.ok],["AI",d.ai_service.configured],["MONITOR",d.monitor_chat.last_result === "Thành công"]]
         .forEach(([label,ok]) => pills.append(el("span",{className:"service-pill "+(ok?"good":"warn"),textContent:label+" "+(ok?"ONLINE":"CHECK")})));
     }
     const network = $("#dash-system");
     if (network) {
-      const nodes = [["Server API",d.server.ok,fmt(d.server.time)],["Gemini AI",d.gemini.configured,d.gemini.last_call_at?fmt(d.gemini.last_call_at):"Chưa có lượt gọi"],["ML TFLite",d.ml_model.available,d.ml_model.version || "Chưa phát hành"]];
+      const nodes = [["Server API",d.server.ok,fmt(d.server.time)],["OpenRouter AI",d.ai_service.configured,d.ai_service.last_call_at?fmt(d.ai_service.last_call_at):"Chưa có lượt gọi"],["ML TFLite",d.ml_model.available,d.ml_model.version || "Chưa phát hành"]];
       network.replaceChildren();
       nodes.forEach(([label,ok,detail],i) => {
         if(i) network.append(el("div",{className:"network-link"}));
@@ -703,7 +703,7 @@ function closeAiDetail() {
 async function loadAiActivity() {
   const feature = $("#ai-activity-filter").value;
   const body = $("#ai-activity-body");
-  body.replaceChildren(el("tr",{},el("td",{colSpan:6,textContent:"Đang tải lịch sử…",className:"mu"})));
+  body.replaceChildren(el("tr",{},el("td",{colSpan:7,textContent:"Đang tải lịch sử…",className:"mu"})));
   try {
     const data = await api("GET", "/admin/ai-activity?feature=" + encodeURIComponent(feature) + "&limit=200");
     const items = data.items || [];
@@ -737,6 +737,7 @@ async function loadAiActivity() {
         el("td",{textContent:fmt(item.ts)}),
         el("td",{textContent:item.feature_label}),
         el("td",{textContent:item.request_preview || "Không có bản xem trước",className:"ai-preview-cell"}),
+        el("td",{textContent:(item.provider || "—") + (item.model ? " / " + item.model : ""),className:"mu"}),
         el("td",{},el("span",{className:"tag "+(ok?"ok":"bad"),textContent:item.status_label})),
         el("td",{textContent:item.duration_ms == null ? "—" : item.duration_ms + " ms"}),
         el("td",{textContent:failure,className:ok?"mu":"ai-failure-cell"})

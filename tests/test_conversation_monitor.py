@@ -13,6 +13,7 @@ os.environ.setdefault("DB_PATH", str(Path(_TEST_DATA.name) / "monitor-test.db"))
 os.environ.setdefault("SECRET_KEY", "conversation-monitor-test-secret")
 os.environ.setdefault("ADMIN_KEY", "")
 os.environ.setdefault("NEWS_ENABLED", "false")
+os.environ.setdefault("AI_PROVIDER", "gemini")
 os.environ.setdefault("ALLOW_REGISTRATION", "true")
 
 import server
@@ -60,6 +61,85 @@ class GeminiRetryTests(unittest.TestCase):
         self.assertEqual(call.call_count, 1)
         self.assertEqual(server.gemini_failure_code(), 401)
         self.assertIn("API Key", server.gemini_failure_reason())
+
+
+class OpenRouterFreeTests(unittest.TestCase):
+    def test_openrouter_free_sends_openai_compatible_text_request(self):
+        response = io.BytesIO(json.dumps({
+            "id": "req-test",
+            "model": "nvidia/example-free-model",
+            "choices": [{"message": {"content": "Phân tích mẫu"}}],
+        }).encode("utf-8"))
+        with patch.multiple(
+            server,
+            AI_PROVIDER="openrouter",
+            OPENROUTER_API_KEY="or-test-key",
+        ), patch.object(server.urllib.request, "urlopen", return_value=response) as call:
+            result = server.ai_generate("SYSTEM", "Nội dung cần kiểm tra", max_tokens=400)
+        self.assertEqual(result, "Phân tích mẫu")
+        self.assertEqual(call.call_count, 1)
+        req = call.call_args.args[0]
+        self.assertEqual(req.full_url, "https://openrouter.ai/api/v1/chat/completions")
+        self.assertEqual(req.get_header("Authorization"), "Bearer or-test-key")
+        payload = json.loads(req.data.decode("utf-8"))
+        self.assertEqual(payload["model"], "openrouter/free")
+        self.assertEqual(payload["messages"][0]["role"], "system")
+        self.assertEqual(server.ai_provider_used(), "openrouter")
+        self.assertEqual(server.ai_model_used(), "nvidia/example-free-model")
+
+    def test_openrouter_free_converts_base64_image_to_data_url(self):
+        response = io.BytesIO(json.dumps({
+            "model": "nvidia/example-vision-free",
+            "choices": [{"message": {"content": "Ảnh có một hóa đơn"}}],
+        }).encode("utf-8"))
+        with patch.multiple(
+            server,
+            AI_PROVIDER="openrouter",
+            OPENROUTER_API_KEY="or-test-key",
+        ), patch.object(server.urllib.request, "urlopen", return_value=response) as call:
+            result = server.ai_generate("SYSTEM", [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "aGVsbG8="}},
+                {"type": "text", "text": "Đánh giá ảnh"},
+            ])
+        self.assertEqual(result, "Ảnh có một hóa đơn")
+        payload = json.loads(call.call_args.args[0].data.decode("utf-8"))
+        self.assertEqual(payload["model"], "openrouter/free")
+        content = payload["messages"][1]["content"]
+        self.assertTrue(any(
+            part.get("type") == "image_url"
+            and part["image_url"]["url"].startswith("data:image/png;base64,")
+            for part in content
+        ))
+
+    def test_openrouter_429_is_reported_without_retries(self):
+        failure = server.urllib.error.HTTPError(
+            "https://openrouter.ai/api/v1/chat/completions",
+            429, "Rate limited", {},
+            io.BytesIO(b'{"error":{"message":"free daily limit reached","code":429}}')
+        )
+        with patch.multiple(
+            server,
+            AI_PROVIDER="openrouter",
+            OPENROUTER_API_KEY="or-test-key",
+        ), patch.object(server.urllib.request, "urlopen", side_effect=failure) as call:
+            result = server.ai_generate("SYSTEM", "test")
+        self.assertIsNone(result)
+        self.assertEqual(call.call_count, 1)
+        self.assertEqual(server.gemini_failure_code(), 429)
+        self.assertIn("lượt/ngày", server.gemini_failure_reason())
+
+    def test_missing_openrouter_key_never_falls_back_to_legacy_gemini(self):
+        with patch.multiple(
+            server,
+            AI_PROVIDER="openrouter",
+            OPENROUTER_API_KEY="",
+            GEMINI_API_KEY="legacy-gemini-key",
+        ), patch.object(server.urllib.request, "urlopen") as call:
+            result = server.ai_generate("SYSTEM", "test")
+        self.assertIsNone(result)
+        call.assert_not_called()
+        self.assertEqual(server.configured_ai_provider(), "rules")
+        self.assertIn("OPENROUTER_API_KEY", server.gemini_failure_reason())
 
 
 class ConversationMonitorNormalizationTests(unittest.TestCase):
@@ -337,8 +417,23 @@ class AiActivityHistoryTests(unittest.TestCase):
                 "WHERE feature='monitor' ORDER BY id DESC LIMIT 1"
             ).fetchone()
         self.assertEqual(row[0], "failure")
-        self.assertIn("Gemini chưa được cấu hình", row[1])
-        self.assertIn("API Key", row[2])
+        self.assertIn("chưa cấu hình nhà cung cấp AI", row[1])
+        self.assertIn("GEMINI_API_KEY", row[2])
+
+
+    def test_activity_history_persists_provider_and_resolved_model(self):
+        server._GEMINI_LOCAL.provider_used = "openrouter"
+        server._GEMINI_LOCAL.model_used = "nvidia/example-free-model"
+        server.record_ai_status(
+            "chat", "success", server.time.perf_counter() - 0.01,
+            "Kiểm tra nội dung mẫu",
+        )
+        with server.sqlite3.connect(server.DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT provider, model FROM ai_activity ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+        self.assertEqual(row[0], "openrouter")
+        self.assertEqual(row[1], "nvidia/example-free-model")
 
 
     def test_activity_endpoint_requires_admin_key(self):
