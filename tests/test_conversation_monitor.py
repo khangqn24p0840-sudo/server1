@@ -272,7 +272,13 @@ class AiActivityHistoryTests(unittest.TestCase):
         self.assertNotIn("0912345678", item["request_preview"])
 
     def test_monitor_without_gemini_key_is_recorded_with_reason(self):
-        headers = ConversationMonitorApiTests().register()
+        email = f"activity-{uuid.uuid4().hex[:8]}@example.test"
+        registered = self.client.post(
+            "/api/register",
+            json={"email": email, "password": "test-password-123", "username": "Activity"},
+        )
+        self.assertEqual(registered.status_code, 200, registered.get_json())
+        headers = {"Authorization": "Bearer " + registered.get_json()["token"]}
         with patch.object(server, "GEMINI_API_KEY", ""):
             response = self.client.post(
                 "/api/monitor/conversation",
