@@ -75,7 +75,7 @@ Nếu không có `GEMINI_API_KEY`, các bộ quy tắc cục bộ vẫn hoạt �
 }
 ```
 
-Máy chủ gửi nội dung này trực tiếp tới Gemini để trả về `risk_score`, `risk_level`, `summary`, `evidence`, `recommended_action` và `confidence`. Endpoint giới hạn 12 yêu cầu/phút/tài khoản, giới hạn tổng dữ liệu 6.000 ký tự, và **không lưu transcript** vào cơ sở dữ liệu hoặc log. App chỉ gọi endpoint sau khi người dùng bật đồng ý phân tích tự động trong màn hình Theo dõi chat, hoặc chủ động bấm phân tích.
+Máy chủ gửi nội dung này trực tiếp tới Gemini để trả về `risk_score`, `risk_level`, `summary`, `evidence`, `recommended_action`, `confidence` và `conversation_memory`. App có thể gửi kèm trường `memory` là bản tóm tắt ngữ cảnh có cấu trúc của chính thread đó. Bộ nhớ được lưu cục bộ trên thiết bị và gửi lại ở lần phân tích sau; server chỉ xử lý trong yêu cầu hiện tại, không lưu transcript hoặc bộ nhớ vào cơ sở dữ liệu/log. Bộ nhớ gồm tóm tắt, sự kiện, hành vi quan sát được và điểm còn cần xác minh; server giới hạn kích thước và số mục. Endpoint giới hạn 12 yêu cầu/phút/tài khoản, giới hạn transcript 6.000 ký tự. App chỉ gọi endpoint sau khi người dùng đồng ý bật phân tích tự động trong Theo dõi chat, hoặc chủ động bấm phân tích. Xóa đối tượng theo dõi cũng xóa bộ nhớ liên quan trên thiết bị.
 
 Endpoint `/api/chat` và giao diện chatbot thông thường vẫn giữ giao thức cũ, độc lập với endpoint theo dõi chat.
 
