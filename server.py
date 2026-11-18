@@ -119,8 +119,8 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = os.environ.get("DB_PATH", str(DATA_DIR / "scamshield.db"))
 ADMIN_KEY = os.environ.get("ADMIN_KEY", "")               # để trống = tắt API quản trị
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()  # API key Google AI Studio; giữ bí mật
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash").strip()
-GEMINI_FALLBACK_MODEL = os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite").strip()
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
+GEMINI_FALLBACK_MODEL = os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-3.8-flash").strip()
 # Text AI uses Google Gemini when GEMINI_API_KEY is configured; otherwise local rules remain available.
 VIETQR_CLIENT_ID = os.environ.get("VIETQR_CLIENT_ID", "").strip()
 VIETQR_API_KEY = os.environ.get("VIETQR_API_KEY", "").strip()
