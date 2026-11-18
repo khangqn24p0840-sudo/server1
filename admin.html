@@ -10,6 +10,9 @@
 body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:radial-gradient(ellipse at 80% 0%,#21145c 0%,var(--bg) 55%);color:var(--tx)}
 header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:rgba(20,26,61,.96);border-bottom:1px solid var(--bd);box-shadow:0 8px 30px #0004}
 h1{font-size:18px;margin:0}
+.head-actions{display:flex;align-items:center;gap:14px}
+#clock-display{font-size:13px;color:var(--mu);font-variant-numeric:tabular-nums}
+@media(max-width:560px){header{align-items:flex-start;gap:10px;flex-direction:column}.head-actions{width:100%;justify-content:space-between}}
 main{max-width:1000px;margin:0 auto;padding:20px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 12px 30px #0003}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
@@ -56,7 +59,7 @@ code{background:var(--bg);padding:6px 10px;border-radius:6px;display:block;margi
 </div>
 
 <div id="app" class="hide">
-  <header><h1>🛡️ ScamShield – Quản trị</h1><button id="out">Thoát</button></header>
+  <header><h1>🛡️ ScamShield – Quản trị</h1><div class="head-actions"><span id="clock-display" aria-live="off">Đang tải ngày giờ…</span><button id="out">Thoát</button></div></header>
   <main>
     <div class="stats" id="stats"></div>
     <div class="tabs">
@@ -160,7 +163,17 @@ const el = (tag, props = {}, ...kids) => {
   kids.forEach(k => e.append(k));
   return e;
 };
-const fmt = ts => ts ? new Date(ts * 1000).toLocaleString("vi-VN") : "";
+const VN_TIME = {timeZone: "Asia/Ho_Chi_Minh"};
+const fmt = ts => ts ? new Date(ts * 1000).toLocaleString("vi-VN", VN_TIME) : "—";
+function updateClock() {
+  const node = $("#clock-display");
+  if (node) node.textContent = "Giờ Việt Nam: " + new Date().toLocaleString("vi-VN", {
+    ...VN_TIME, day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+  });
+}
+updateClock();
+setInterval(updateClock, 1000);
 function toast(m){const t=$("#toast");t.textContent=m;t.style.display="block";clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display="none",3000)}
 
 async function api(method, path, data) {
@@ -367,7 +380,7 @@ async function loadDash() {
       [el("span", {textContent: "Bình luận bị báo cáo (chưa ẩn)"}), go("comments", m.comments_reported)]], "");
     listRows($("#top"), d.top.map(u => [el("span", {textContent: u.email}), el("span", {className: "mu", textContent: u.posts + " bài • " + u.comments + " bình luận"})]), "Chưa có ai đóng góp.");
     listRows($("#recent"), d.recent.map(u => [el("span", {textContent: u.email}), el("span", {className: "mu", textContent: fmt(u.created)})]), "Chưa có tài khoản nào.");
-    $("#dupd").textContent = "Cập nhật lúc " + new Date().toLocaleTimeString("vi-VN") + " • tự làm mới mỗi 30 giây khi tab này đang mở";
+    $("#dupd").textContent = "Cập nhật lúc " + new Date().toLocaleString("vi-VN", VN_TIME) + " • tự làm mới mỗi 30 giây khi tab này đang mở";
   } catch (e) { toast(e.message); }
 }
 $("#dd").onchange = loadDash; $("#dr").onclick = () => { loadDash(); loadStats(); };
@@ -458,14 +471,19 @@ async function loadAiStatus() {
     g.append(statusLine("Nhà cung cấp",d.gemini.provider.toUpperCase(),d.gemini.configured));
     g.append(statusLine("Model",d.gemini.model || "Không dùng Gemini",d.gemini.configured));
     g.append(statusLine("AI media",d.media_ai.configured ? "Đã bật theo cấu hình" : "Chưa bật",d.media_ai.configured));
+    g.append(statusLine("Gemini gọi gần nhất",fmt(d.gemini.last_call_at),!!d.gemini.last_call_at));
+    g.append(statusLine("Được gọi từ",d.gemini.last_call_from || "Chưa có",!!d.gemini.last_call_from));
+    g.append(statusLine("Kết quả Gemini gần nhất",d.gemini.last_call_result || "Chưa có",d.gemini.last_call_result === "Thành công"));
     renderUsage($("#ai-monitor"),d.monitor_chat,"Chưa có lượt phân tích");
     renderUsage($("#ai-chat"),d.normal_chat,"Chưa có lượt chat");
     const sys=$("#ai-system"); sys.replaceChildren();
     sys.append(statusLine("Máy chủ",d.server.ok ? "Đang hoạt động" : "Không phản hồi",d.server.ok));
+    sys.append(statusLine("Ngày giờ server trả lời",fmt(d.server.time),d.server.ok));
+    sys.append(statusLine("Server khởi động lúc",fmt(d.server.started_at),d.server.ok));
     sys.append(statusLine("TFLite",d.ml_model.available ? "Có sẵn" : "Thiếu file",d.ml_model.available));
     sys.append(statusLine("Dung lượng model",d.ml_model.available ? (Math.round(d.ml_model.bytes/1024)+" KB") : "—",d.ml_model.available));
     sys.append(statusLine("Phiên bản model",d.ml_model.version || "Chưa đặt",d.ml_model.available));
-    $("#ai-updated").textContent = "Cập nhật " + new Date().toLocaleTimeString("vi-VN");
+    $("#ai-updated").textContent = "Cập nhật " + new Date().toLocaleString("vi-VN", VN_TIME);
   } catch(e) { toast("Không tải được trạng thái AI: " + e.message); }
 }
 $("#ai-refresh").onclick = loadAiStatus;
