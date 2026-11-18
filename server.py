@@ -46,6 +46,7 @@ from flask import Flask, g, jsonify, request, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
 
 # Thống kê chẩn đoán AI trong bộ nhớ tiến trình (không lưu nội dung hội thoại).
+SERVER_STARTED_AT = int(time.time())
 _AI_STATUS_LOCK = threading.Lock()
 _AI_STATUS = {
     "monitor": {"requests": 0, "success": 0, "failures": 0, "last_at": None, "last_result": "Chưa có lượt phân tích", "last_ms": None},
@@ -432,10 +433,15 @@ def admin_ai_status():
     """Tình trạng AI/server và số liệu chẩn đoán không chứa transcript."""
     with _AI_STATUS_LOCK:
         usage = {name: dict(values) for name, values in _AI_STATUS.items()}
+    candidates = [(name, values) for name, values in usage.items() if values["last_at"] is not None]
+    latest = max(candidates, key=lambda pair: pair[1]["last_at"]) if candidates else (None, None)
     return jsonify(
-        server={"ok": True, "time": int(time.time())},
+        server={"ok": True, "time": int(time.time()), "started_at": SERVER_STARTED_AT},
         gemini={"configured": bool(GEMINI_API_KEY), "provider": "gemini" if GEMINI_API_KEY else "rules",
-                "model": GEMINI_MODEL if GEMINI_API_KEY else None},
+                "model": GEMINI_MODEL if GEMINI_API_KEY else None,
+                "last_call_at": latest[1]["last_at"] if latest[1] else None,
+                "last_call_from": ("Theo dõi chat" if latest[0] == "monitor" else "Chatbot thông thường") if latest[0] else None,
+                "last_call_result": latest[1]["last_result"] if latest[1] else "Chưa có lượt gọi"},
         media_ai={"configured": bool(GEMINI_API_KEY)},
         monitor_chat=usage["monitor"],
         normal_chat=usage["chat"],
