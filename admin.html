@@ -329,6 +329,7 @@ async function enter() {
   try { await loadStats(); } catch (e) { $("#lerr").textContent = e.message; sessionStorage.removeItem("ak"); return; }
   $("#login").classList.add("hide"); $("#app").classList.remove("hide");
   loadDash();
+  loadAiStatus();
 }
 
 async function loadStats() {
@@ -642,7 +643,7 @@ async function loadAiStatus() {
   } catch(e) { toast("Không tải được trạng thái AI: " + e.message); }
 }
 $("#ai-refresh").onclick = loadAiStatus;
-setInterval(() => { if (KEY && !document.hidden && !$("#t-ai").classList.contains("hide")) loadAiStatus(); }, 10000);
+setInterval(() => { if (KEY && !document.hidden && (!$("#t-ai").classList.contains("hide") || !$("#t-dash").classList.contains("hide"))) loadAiStatus(); }, 10000);
 
 let qt; $("#q").oninput = () => { clearTimeout(qt); qt = setTimeout(loadUsers, 300); };
 $("#rf").onclick = () => { loadUsers(); loadStats(); };
