@@ -271,6 +271,25 @@ class AiActivityHistoryTests(unittest.TestCase):
         self.assertNotIn("123456", item["request_preview"])
         self.assertNotIn("0912345678", item["request_preview"])
 
+    def test_monitor_without_gemini_key_is_recorded_with_reason(self):
+        headers = ConversationMonitorApiTests().register()
+        with patch.object(server, "GEMINI_API_KEY", ""):
+            response = self.client.post(
+                "/api/monitor/conversation",
+                json={"messages": [{"sender": "Người gửi", "text": "Nội dung thử", "timestamp": 1000}]},
+                headers=headers,
+            )
+        self.assertEqual(response.status_code, 503)
+        with server.sqlite3.connect(server.DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT status, request_preview, failure_reason FROM ai_activity "
+                "WHERE feature='monitor' ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+        self.assertEqual(row[0], "failure")
+        self.assertIn("Gemini chưa được cấu hình", row[1])
+        self.assertIn("API Key", row[2])
+
+
     def test_activity_endpoint_requires_admin_key(self):
         response = self.client.get("/admin/ai-activity")
         self.assertIn(response.status_code, (403, 404))
