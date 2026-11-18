@@ -503,15 +503,11 @@ def configured_ai_model():
 
 
 def ai_provider_used():
-    configured = configured_ai_provider()
-    if configured == "rules":
-        return "rules"
-    return getattr(_GEMINI_LOCAL, "provider_used", None) or configured
+    # The request-local value is authoritative for the model call that just completed.
+    return getattr(_GEMINI_LOCAL, "provider_used", None) or configured_ai_provider()
 
 
 def ai_model_used():
-    if configured_ai_provider() == "rules":
-        return None
     return getattr(_GEMINI_LOCAL, "model_used", None) or configured_ai_model()
 
 
@@ -2229,6 +2225,8 @@ def monitor_conversation_api():
     """Analyze one selected tracked conversation with Gemini; transcript is not stored server-side."""
     rate_limit(("monitor_conversation", g.user["id"]), 12, per=60)
     if not provider_is_configured():
+        _GEMINI_LOCAL.provider_used = AI_PROVIDER if AI_PROVIDER in ("openrouter", "gemini") else "rules"
+        _GEMINI_LOCAL.model_used = None
         required_key = "OPENROUTER_API_KEY" if AI_PROVIDER == "openrouter" else "GEMINI_API_KEY"
         record_ai_status(
             "monitor", "failure", time.perf_counter(),
