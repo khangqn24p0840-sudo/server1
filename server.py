@@ -45,7 +45,7 @@ import jwt
 from flask import Flask, g, jsonify, request, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
 
-# Thống kê chẩn đoán AI trong bộ nhớ tiến trình (không lưu nội dung hội thoại).
+# Thống kê AI trong bộ nhớ tiến trình và nhật ký hoạt động đã lọc dữ liệu nhạy cảm.
 SERVER_STARTED_AT = int(time.time())
 _AI_STATUS_LOCK = threading.Lock()
 _GEMINI_LOCAL = threading.local()
@@ -544,6 +544,7 @@ def admin_clear_ai_activity():
     d = db()
     count = d.execute("SELECT COUNT(*) FROM ai_activity").fetchone()[0]
     d.execute("DELETE FROM ai_activity")
+    d.commit()
     return jsonify(ok=True, deleted=count)
 
 
@@ -2011,6 +2012,11 @@ def monitor_conversation_api():
     """Analyze one selected tracked conversation with Gemini; transcript is not stored server-side."""
     rate_limit(("monitor_conversation", g.user["id"]), 12, per=60)
     if not GEMINI_API_KEY:
+        record_ai_status(
+            "monitor", "failure", time.perf_counter(),
+            "Phân tích cuộc trò chuyện (Gemini chưa được cấu hình).",
+            "Chưa cấu hình Gemini API Key trên máy chủ.",
+        )
         raise ApiError("Gemini chưa được cấu hình trên máy chủ.", 503)
 
     request_data = body()
