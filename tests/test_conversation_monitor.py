@@ -47,6 +47,20 @@ class ConversationMonitorNormalizationTests(unittest.TestCase):
         self.assertEqual(result["confidence"], "LOW")
         self.assertLessEqual(len(result["summary"]), 600)
 
+    def test_normalizes_and_bounds_conversation_memory(self):
+        result = server.normalize_conversation_analysis(json.dumps({
+            "risk_score": 44,
+            "conversation_memory": {
+                "summary": "x" * 1600,
+                "key_facts": ["fact"] * 12,
+                "behavior_patterns": ["pattern"],
+                "open_questions": ["question"],
+            },
+        }))
+        self.assertEqual(len(result["conversation_memory"]["summary"]), 1200)
+        self.assertEqual(len(result["conversation_memory"]["key_facts"]), 8)
+        self.assertEqual(result["conversation_memory"]["behavior_patterns"], ["pattern"])
+
     def test_rejects_invalid_or_missing_risk_score(self):
         self.assertIsNone(server.normalize_conversation_analysis("not json"))
         self.assertIsNone(server.normalize_conversation_analysis('{"risk_score":"high"}'))
@@ -112,6 +126,48 @@ class ConversationMonitorApiTests(unittest.TestCase):
         self.assertEqual(payload["last_message_timestamp"], 2000)
         self.assertTrue(payload["ai"])
         gemini_call.assert_called_once()
+
+    def test_endpoint_receives_previous_memory_and_returns_updated_memory(self):
+        headers = self.register()
+        raw = json.dumps({
+            "risk_score": 75,
+            "summary": "Cuộc trò chuyện có chuyển biến đáng ngờ.",
+            "evidence": ["Sau khi tạo lòng tin, đối phương yêu cầu phí trước."],
+            "recommended_action": "Không chuyển tiền; xác minh qua kênh chính thức.",
+            "confidence": "HIGH",
+            "conversation_memory": {
+                "summary": "Ban đầu tạo lòng tin, sau đó yêu cầu khoản phí.",
+                "key_facts": ["Đối phương tự nhận hỗ trợ hồ sơ."],
+                "behavior_patterns": ["Chuyển từ thân thiện sang thúc ép."],
+                "open_questions": ["Chưa xác minh được danh tính."],
+            },
+        }, ensure_ascii=False)
+        previous = {
+            "summary": "Đối phương ban đầu trò chuyện thân thiện.",
+            "key_facts": ["Chưa yêu cầu tiền ở giai đoạn đầu."],
+            "behavior_patterns": ["Tạo lòng tin."],
+            "open_questions": [],
+        }
+        with patch.object(server, "GEMINI_API_KEY", "test-gemini-key"), \
+             patch.object(server, "gemini", return_value=raw) as gemini_call:
+            response = self.client.post(
+                "/api/monitor/conversation",
+                json={
+                    "memory": previous,
+                    "messages": [
+                        {"sender": "Người lạ", "text": "Mình sẽ hỗ trợ bạn.", "timestamp": 1000},
+                        {"sender": "Người lạ", "text": "Bạn cần đóng phí xác minh.", "timestamp": 2000},
+                    ],
+                },
+                headers=headers,
+            )
+        self.assertEqual(response.status_code, 200, response.get_json())
+        prompt = gemini_call.call_args.args[1]
+        self.assertIn("Đối phương ban đầu trò chuyện thân thiện", prompt)
+        self.assertEqual(
+            response.get_json()["conversation_memory"]["behavior_patterns"],
+            ["Chuyển từ thân thiện sang thúc ép."],
+        )
 
     def test_endpoint_rejects_more_than_twelve_messages(self):
         headers = self.register()
