@@ -94,6 +94,15 @@ App gọi POST /api/bank/lookup qua máy chủ đã đăng nhập; server không
 Tên chủ tài khoản chỉ giúp đối chiếu người nhận, không chứng minh tài khoản an toàn hoặc không liên quan lừa đảo.
 VietQR có thể giới hạn hỗ trợ theo ngân hàng và gói dịch vụ.
 
+## 4a. Trang quản trị và giám sát AI
+
+Mở `/admin` từ chính máy chạy server và đăng nhập bằng `ADMIN_KEY`.
+Mục **AI & Hệ thống** hiển thị cấu hình Gemini, model, thời điểm gọi gần nhất,
+lượt thành công/thất bại riêng cho **Theo dõi chat** và **Chatbot thông thường**,
+thời điểm server khởi động và tình trạng file TFLite. Thời gian hiển thị theo múi giờ Việt Nam.
+Số liệu lời gọi AI chỉ được giữ trong bộ nhớ của tiến trình server và đặt lại khi khởi động lại;
+không lưu transcript, nội dung hội thoại hay API key vào bảng giám sát.
+
 ## 4. Quản lý danh sách số lừa đảo cộng đồng
 
 Dùng header `X-Admin-Key` (giá trị `ADMIN_KEY`). Số được tự chuẩn hóa về dạng `+84...`.

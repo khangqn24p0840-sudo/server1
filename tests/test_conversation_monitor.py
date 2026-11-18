@@ -196,5 +196,25 @@ class ConversationMonitorApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
 
 
+class AdminAiStatusTests(unittest.TestCase):
+    def test_ai_status_includes_server_clock_and_monitor_usage(self):
+        server.app.config.update(TESTING=True)
+        client = server.app.test_client()
+        server.record_ai_status("monitor", "success", server.time.perf_counter() - 0.01)
+        with patch.multiple(server, ADMIN_KEY="test-admin-key",
+                            GEMINI_API_KEY="not-a-real-key", GEMINI_MODEL="gemini-test"):
+            response = client.get("/admin/ai-status", headers={"X-Admin-Key": "test-admin-key"})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        data = response.get_json()
+        self.assertTrue(data["server"]["ok"])
+        self.assertGreater(data["server"]["started_at"], 0)
+        self.assertTrue(data["gemini"]["configured"])
+        self.assertEqual(data["gemini"]["provider"], "gemini")
+        self.assertGreaterEqual(data["monitor_chat"]["success"], 1)
+        self.assertIsNotNone(data["monitor_chat"]["last_at"])
+        self.assertEqual(data["gemini"]["last_call_from"], "Theo dõi chat")
+        self.assertNotIn("api_key", data["gemini"])
+
+
 if __name__ == "__main__":
     unittest.main()

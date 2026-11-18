@@ -45,6 +45,27 @@ import jwt
 from flask import Flask, g, jsonify, request, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
 
+# Thống kê chẩn đoán AI trong bộ nhớ tiến trình (không lưu nội dung hội thoại).
+SERVER_STARTED_AT = int(time.time())
+_AI_STATUS_LOCK = threading.Lock()
+_AI_STATUS = {
+    "monitor": {"requests": 0, "success": 0, "failures": 0, "last_at": None, "last_result": "Chưa có lượt phân tích", "last_ms": None},
+    "chat": {"requests": 0, "success": 0, "failures": 0, "last_at": None, "last_result": "Chưa có lượt chat", "last_ms": None},
+}
+
+def record_ai_status(feature, outcome, started=None):
+    if feature not in _AI_STATUS:
+        return
+    now = int(time.time())
+    elapsed = round((time.perf_counter() - started) * 1000) if started is not None else None
+    with _AI_STATUS_LOCK:
+        item = _AI_STATUS[feature]
+        item["requests"] += 1
+        item["success" if outcome == "success" else "failures"] += 1
+        item["last_at"] = now
+        item["last_result"] = "Thành công" if outcome == "success" else "Thất bại"
+        item["last_ms"] = elapsed
+
 # ----------------------------------------------------------------- cấu hình
 DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -403,6 +424,32 @@ def health():
         ai_provider=provider,
         ai_model=GEMINI_MODEL if provider == "gemini" else None,
         media_ai=bool(GEMINI_API_KEY),
+    )
+
+
+@app.get("/admin/ai-status")
+@admin
+def admin_ai_status():
+    """Tình trạng AI/server và số liệu chẩn đoán không chứa transcript."""
+    with _AI_STATUS_LOCK:
+        usage = {name: dict(values) for name, values in _AI_STATUS.items()}
+    candidates = [(name, values) for name, values in usage.items() if values["last_at"] is not None]
+    latest = max(candidates, key=lambda pair: pair[1]["last_at"]) if candidates else (None, None)
+    return jsonify(
+        server={"ok": True, "time": int(time.time()), "started_at": SERVER_STARTED_AT},
+        gemini={"configured": bool(GEMINI_API_KEY), "provider": "gemini" if GEMINI_API_KEY else "rules",
+                "model": GEMINI_MODEL if GEMINI_API_KEY else None,
+                "last_call_at": latest[1]["last_at"] if latest[1] else None,
+                "last_call_from": ("Theo dõi chat" if latest[0] == "monitor" else "Chatbot thông thường") if latest[0] else None,
+                "last_call_result": latest[1]["last_result"] if latest[1] else "Chưa có lượt gọi"},
+        media_ai={"configured": bool(GEMINI_API_KEY)},
+        monitor_chat=usage["monitor"],
+        normal_chat=usage["chat"],
+        ml_model={"available": MODEL_PATH.is_file(),
+                  "bytes": MODEL_PATH.stat().st_size if MODEL_PATH.is_file() else 0,
+                  "version": MODEL_VERSION_PATH.read_text(encoding="utf-8").strip()
+                  if MODEL_VERSION_PATH.is_file() else None},
+        metrics_scope="Từ lúc tiến trình server khởi động; không lưu nội dung hội thoại."
     )
 
 
@@ -1910,10 +1957,13 @@ def monitor_conversation_api():
         "<previous_memory>\n" + json.dumps(previous_memory, ensure_ascii=False) +
         "\n</previous_memory>\n<new_messages>\n" + "\n".join(lines) + "\n</new_messages>"
     )
+    ai_started = time.perf_counter()
     raw = gemini(system, prompt, max_tokens=1400)
     normalized = normalize_conversation_analysis(raw)
     if normalized is None:
+        record_ai_status("monitor", "failure", ai_started)
         raise ApiError("Gemini chưa trả về kết quả phân tích hợp lệ. Hãy thử lại sau.", 502)
+    record_ai_status("monitor", "success", ai_started)
     return jsonify(**normalized, ai=True, message_count=len(lines), last_message_timestamp=last_message_timestamp)
 
 
@@ -1939,8 +1989,10 @@ def chat_api():
     context = "\n".join(transcript)
     prompt = (f"Lịch sử hội thoại gần đây:\n{context}\n\nTin nhắn mới của người dùng:\n"
               f"<user_message>\n{message}\n</user_message>\nHãy trả lời tin nhắn mới.")
+    ai_started = time.perf_counter()
     answer = text_ai(CHAT_SYSTEM, prompt, max_tokens=1100)
     ai_answered = bool(answer)
+    record_ai_status("chat", "success" if ai_answered else "failure", ai_started)
     mode, risk = "assistant", None
     if not answer:
         low = message.lower()
