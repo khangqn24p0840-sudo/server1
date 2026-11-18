@@ -96,6 +96,12 @@ VietQR có thể giới hạn hỗ trợ theo ngân hàng và gói dịch vụ.
 
 ## 4a. Trang quản trị và giám sát AI
 
+Lịch sử chi tiết dashboard AI lưu tối đa 500 sự kiện trong 30 ngày. Mỗi bản ghi chỉ có loại tính năng,
+trạng thái, thời gian, thời lượng, bản xem trước yêu cầu đã che số điện thoại, email, dãy số dài,
+trường OTP/mật khẩu và tham số truy vấn URL, cùng lý do lỗi Gemini. Với Theo dõi chat, chỉ lưu số lượng/
+kích thước tin nhắn; không lưu transcript. Ảnh không được lưu. Quản trị viên có thể xóa lịch sử trong dashboard.
+
+
 Mở `/admin` từ chính máy chạy server và đăng nhập bằng `ADMIN_KEY`.
 Mục **AI & Hệ thống** hiển thị cấu hình Gemini, model, thời điểm gọi gần nhất,
 lượt thành công/thất bại riêng cho **Theo dõi chat** và **Chatbot thông thường**,
